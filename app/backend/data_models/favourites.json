@@ -1,0 +1,23 @@
+{
+    "title": "favourites",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "chef_id": {
+            "type": "integer"
+        },
+        "menu_item_id": {
+            "type": "integer"
+        }
+    },
+    "required": [
+        "id",
+        "user_id",
+        "chef_id"
+    ]
+}

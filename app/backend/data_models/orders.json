@@ -1,0 +1,62 @@
+{
+    "title": "orders",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "chef_id": {
+            "type": "integer"
+        },
+        "items_json": {
+            "type": "string"
+        },
+        "total_amount": {
+            "type": "number"
+        },
+        "commission_amount": {
+            "type": "number"
+        },
+        "chef_amount": {
+            "type": "number"
+        },
+        "status": {
+            "type": "string",
+            "maxLength": 50,
+            "default": "pending"
+        },
+        "delivery_type": {
+            "type": "string",
+            "maxLength": 50
+        },
+        "delivery_address": {
+            "type": "string",
+            "maxLength": 500
+        },
+        "customer_name": {
+            "type": "string",
+            "maxLength": 200
+        },
+        "customer_phone": {
+            "type": "string",
+            "maxLength": 50
+        },
+        "stripe_session_id": {
+            "type": "string",
+            "maxLength": 300
+        },
+        "payment_status": {
+            "type": "string",
+            "maxLength": 50,
+            "default": "unpaid"
+        }
+    },
+    "required": [
+        "user_id",
+        "chef_id",
+        "total_amount"
+    ]
+}

@@ -1,0 +1,280 @@
+Before adding any new features, perform a complete production-readiness audit of the current DishBar application.
+
+The goal is to prepare DishBar for a small private pilot with one chef and a limited number of customers in Ontario.
+
+Do not claim that any feature is working unless you have tested and verified it.
+
+Complete the following tasks in order:
+
+Audit the current application
+
+Review the frontend, backend, database, authentication, payments, order processing, chef portal, customer portal and admin portal.
+
+Create a checklist showing:
+
+Fully working features
+Partially implemented features
+Mock or placeholder features
+Features with hardcoded data
+Features that are only visual and are not connected to the backend
+Security or privacy risks
+Missing environment variables
+Missing third-party integrations
+Errors that would prevent real customers from ordering
+Verify authentication
+
+Confirm that customer, chef and administrator accounts have separate permissions.
+
+Test:
+
+Customer registration and login
+Chef registration and login
+Administrator login
+Password or phone verification
+Logout
+Session persistence
+Protected routes
+Prevention of customers accessing chef or administrator pages
+Prevention of chefs accessing administrator functions
+
+If SMS OTP is not connected to a real provider, clearly identify it as incomplete. Do not simulate successful OTP authentication in production.
+
+Verify Stripe payments
+
+Confirm whether Stripe is currently operating in test mode or live mode.
+
+Verify:
+
+Stripe keys are stored securely
+No secret key is exposed in frontend code
+Checkout sessions are created by the backend
+Payment amount is calculated on the backend
+Delivery fees, taxes, discounts, tips and totals cannot be manipulated from the browser
+Payment success is confirmed through Stripe webhooks
+Failed or abandoned payments do not create paid orders
+Refunds work
+Duplicate charges are prevented
+Stripe Connect chef accounts are genuinely connected
+Commission calculations are correct
+Payouts are disabled or manual during the pilot unless fully verified
+
+Display a clear warning in the admin portal if Stripe is not fully configured.
+
+Replace fake distance calculations
+
+The current delivery fee must not be based only on matching the customer’s typed address to a list of Ontario cities.
+
+Implement proper address validation and geocoding.
+
+Requirements:
+
+Store each chef’s complete pickup address securely
+Ask customers for a complete delivery address
+Convert both addresses to coordinates through a reliable maps or geocoding service
+Calculate the actual route distance when possible
+Prevent checkout when the address cannot be verified
+Allow the administrator to configure:
+Base delivery fee
+Included distance
+Per-kilometre fee
+Maximum delivery distance
+Maximum delivery fee
+Free-pickup option
+Show the customer the distance, delivery fee and estimated delivery area before payment
+Do not publicly display the chef’s private home address
+
+For the initial pilot, create a simpler backup option allowing the administrator to define delivery zones by postal-code prefix and set a fixed fee for each zone.
+
+Create a pilot mode
+
+Add a configurable PILOT_MODE setting.
+
+When pilot mode is active:
+
+Only approved chefs appear publicly
+Only selected postal-code areas can order
+The administrator can set opening days and ordering hours
+The administrator can set a daily order limit
+The administrator can pause all ordering immediately
+Customers see a message explaining that DishBar is currently operating as a limited pilot
+Chef payouts remain manual
+New chef applications can be collected but cannot automatically go live
+Add real operational controls
+
+Add the following settings to the admin portal:
+
+Platform open or closed
+Pilot delivery areas
+Minimum order
+Maximum delivery radius
+Delivery fees
+Platform commission
+Tax settings
+Cancellation deadline
+Refund rules
+Order cutoff time
+Chef preparation time
+Support email
+Support phone number
+Terms and policy links
+Complete the order workflow
+
+Test the full process:
+
+Customer selects meals → inventory is checked → delivery or pickup is selected → address is validated → fees and taxes are calculated → payment is completed → order is created → chef receives notification → chef accepts or rejects the order → customer receives status updates → order is prepared → order is completed → refund or dispute can be handled by the administrator.
+
+Inventory must be reduced only after successful payment or order confirmation.
+
+Prevent:
+
+Ordering unavailable meals
+Ordering more than available quantity
+Ordering outside the chef’s schedule
+Ordering outside the delivery area
+Ordering after the cutoff time
+Two customers purchasing the final available item simultaneously
+Add required customer information
+
+Before checkout, require:
+
+Full name
+Email
+Phone number
+Delivery address when applicable
+Delivery instructions
+Allergy acknowledgement
+Confirmation that the customer reviewed ingredient and allergen information
+
+Each menu item must support:
+
+Ingredients
+Allergens
+Dietary labels
+Portion size
+Preparation date
+Storage instructions
+Reheating instructions
+Available quantity
+Ordering deadline
+Pickup or delivery availability
+
+Display a clear notice that customers with severe allergies should contact the chef before ordering and that DishBar cannot guarantee an allergen-free environment unless specifically confirmed.
+
+Add essential legal and trust pages
+
+Create editable pages for:
+
+Terms of Service
+Privacy Policy
+Customer Cancellation and Refund Policy
+Chef Agreement
+Food Safety and Allergen Notice
+Delivery and Pickup Policy
+Community and Review Guidelines
+Contact and Customer Support
+
+Do not invent legal guarantees. Clearly mark all policy text as requiring legal review before a full public launch.
+
+Add checkboxes during registration or checkout for acceptance of the applicable terms.
+
+Chef compliance controls
+
+The administrator must be able to record:
+
+Chef identity verification status
+Public health approval status
+Food-handler certification status
+Insurance status
+Kitchen inspection or approval documents
+Document expiry dates
+Approval notes
+Approved food categories
+Allowed delivery or pickup methods
+
+A chef must not become publicly visible simply because they submitted an application.
+
+Privacy and security
+
+Review the application for:
+
+Exposed API keys
+Publicly accessible chef documents
+Public home addresses
+Insecure file uploads
+Missing file type and size restrictions
+SQL injection
+Cross-site scripting
+Missing rate limits
+Missing authorization checks
+Insecure direct object references
+Weak administrator authentication
+Missing audit logs
+
+Chef verification documents must be private and accessible only to authorized administrators.
+
+Pilot data setup
+
+Create a safe admin onboarding process so I can enter:
+
+One pilot chef
+Chef service area
+Chef schedule
+Five to ten meals
+Meal photos
+Ingredients and allergens
+Prices
+Quantities
+Pickup instructions
+Delivery zones and fees
+Support contact information
+
+Do not populate the production application with fake reviews, fake chefs, fake orders or misleading statistics.
+
+End-to-end testing
+
+Create and execute a full test plan covering:
+
+Mobile and desktop
+English, French and Persian
+Persian RTL layout
+Customer registration
+Chef registration
+Admin access
+Successful payment
+Failed payment
+Refund
+Pickup order
+Delivery order
+Invalid address
+Out-of-zone address
+Out-of-stock item
+Coupon
+Order cancellation
+Chef rejection
+Notifications
+Messaging
+Accessibility
+Privacy permissions
+
+Provide the exact test results. Do not report “passed” unless the test was actually executed.
+
+Final launch report
+
+When complete, provide:
+
+What is genuinely working
+What is still incomplete
+What remains simulated
+Which external accounts I must connect
+Which environment variables I must provide
+Steps I must personally complete
+A launch-blocker list
+A recommended pilot launch checklist
+A rollback procedure
+The exact URL for the customer portal
+The exact URL for the chef portal
+The exact URL for the admin portal
+
+Do not add unrelated features or redesign the application during this task.
+
+The immediate objective is a reliable private pilot, not a claim that the platform is ready for one million users.

@@ -1,0 +1,50 @@
+[
+    {
+        "name": "Maryam Hosseini",
+        "name_fa": "مریم حسینی",
+        "bio": "Passionate home chef specializing in traditional Persian stews and rice dishes. 15 years of cooking experience passed down through generations.",
+        "bio_fa": "آشپز خانگی با تخصص در خورش‌ها و پلوهای سنتی ایرانی. ۱۵ سال تجربه آشپزی که از نسل‌های قبل به ارث رسیده.",
+        "avatar_url": "https://images.unsplash.com/photo-1595257841889-eca2678454e2?w=200",
+        "city": "Toronto",
+        "province": "Ontario",
+        "cuisine_tags": "stews,rice,traditional",
+        "rating": 4.8,
+        "total_reviews": 42,
+        "is_approved": true,
+        "is_active": true,
+        "delivery_options": "pickup,self_delivery",
+        "user_id": "1431683"
+    },
+    {
+        "name": "Ali Rezaei",
+        "name_fa": "علی رضایی",
+        "bio": "Master of Persian kebabs and grilled dishes. Using authentic charcoal grilling techniques for the most flavorful results.",
+        "bio_fa": "استاد کباب‌ها و غذاهای گریل ایرانی. استفاده از تکنیک‌های اصیل زغالی برای بهترین طعم.",
+        "avatar_url": "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=200",
+        "city": "North York",
+        "province": "Ontario",
+        "cuisine_tags": "kebabs,grilled,bbq",
+        "rating": 4.9,
+        "total_reviews": 67,
+        "is_approved": true,
+        "is_active": true,
+        "delivery_options": "pickup,self_delivery,third_party",
+        "user_id": "1431683"
+    },
+    {
+        "name": "Sara Mohammadi",
+        "name_fa": "سارا محمدی",
+        "bio": "Specializing in Persian pastries, desserts, and traditional breads. Every recipe is made with love and the finest ingredients.",
+        "bio_fa": "متخصص شیرینی‌ها، دسرها و نان‌های سنتی ایرانی. هر دستور با عشق و بهترین مواد اولیه تهیه می‌شود.",
+        "avatar_url": "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=200",
+        "city": "Mississauga",
+        "province": "Ontario",
+        "cuisine_tags": "pastries,desserts,bread",
+        "rating": 4.7,
+        "total_reviews": 31,
+        "is_approved": true,
+        "is_active": true,
+        "delivery_options": "pickup,third_party",
+        "user_id": "1431683"
+    }
+]

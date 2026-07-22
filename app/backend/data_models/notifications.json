@@ -1,0 +1,49 @@
+{
+    "title": "notifications",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "title": {
+            "type": "string",
+            "maxLength": 200
+        },
+        "title_fa": {
+            "type": "string",
+            "maxLength": 200
+        },
+        "message": {
+            "type": "string",
+            "maxLength": 1000
+        },
+        "message_fa": {
+            "type": "string",
+            "maxLength": 1000
+        },
+        "type": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "order_update, promotion, system, message"
+        },
+        "is_read": {
+            "type": "boolean",
+            "default": false
+        },
+        "reference_id": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "order_id or chef_id reference"
+        }
+    },
+    "required": [
+        "id",
+        "user_id",
+        "title",
+        "message",
+        "type"
+    ]
+}

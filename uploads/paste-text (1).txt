@@ -1,0 +1,599 @@
+You are the lead engineer responsible for completing DishBar and preparing it for a real, small private pilot tonight.
+
+The goal is not to add more features. The goal is to make the existing application reliable enough for:
+
+One real chef
+A limited number of invited customers
+Real Persian food orders
+Ontario pickup and limited local delivery
+Real payments only after successful testing
+Manual chef payouts during the pilot, if Stripe Connect cannot safely be completed tonight
+
+Work through every phase below in order. Do not stop after producing an audit or explanation. Inspect the current code, fix the issues, test each feature, and provide evidence of what actually works.
+
+Critical honesty requirement
+
+Do not describe anything as completed, connected, production-ready, secure, or tested unless you personally verified it in the running application.
+
+Clearly label each item as one of the following:
+
+VERIFIED WORKING
+IMPLEMENTED BUT NOT FULLY TESTED
+SIMULATED OR UI-ONLY
+BLOCKED BY EXTERNAL ACCOUNT OR USER ACTION
+FAILED
+
+Do not create fake test results.
+
+Do not replace real integrations with visual placeholders while claiming the integration is complete.
+
+Scope restriction
+
+Freeze all new feature development.
+
+Do not add loyalty features, advanced analytics, subscriptions, gamification, AI recommendations, additional portals, or unnecessary design changes.
+
+Focus only on the minimum reliable ordering workflow required for tonight’s private pilot.
+
+Phase 1 — Preserve and inspect the current version
+Create a safe backup or restorable version before making changes.
+Inspect the complete frontend, backend, database schema, environment variables, API routes, authentication, Stripe configuration, file storage, admin permissions, order workflow, and deployed version.
+Confirm that Version 12 includes the security and database fixes from Version 11.
+Do not accidentally restore an older version or remove the new food images, logo, legal pages, pilot settings, or checkout improvements.
+Run the application and record all frontend, backend, database, console, network, and build errors.
+Fix all critical errors before continuing.
+Phase 2 — Authentication and role security
+
+Implement and verify secure role-based access for:
+
+Customer
+Chef
+Admin
+
+Requirements:
+
+A normal customer must not be able to access admin pages or admin APIs.
+A chef must not be able to access admin functions.
+An unauthenticated visitor must not access private customer, chef, order, payment, refund, payout, settings, or admin data.
+Backend authorization must protect every sensitive endpoint. Hiding buttons in the frontend is not sufficient.
+Remove any default, hardcoded, or publicly visible admin credentials.
+Verify ownership rules:
+Customers can only view their own orders and messages.
+Chefs can only view orders assigned to them.
+Chefs can only edit their own profile, menus, schedule, inventory, and earnings.
+Only admins can approve or suspend chefs, change commissions, issue refunds, moderate reviews, or change platform settings.
+Test direct API access using the wrong role and confirm that it is denied.
+
+Phone OTP:
+
+Inspect whether SMS OTP is genuinely connected to a provider.
+If it is not connected, do not claim that it works.
+For tonight’s pilot, implement a secure email-based login or email/password login if that can be verified more reliably.
+Remove or disable any misleading “SMS sent” interface when no SMS is actually being sent.
+Label phone OTP as unavailable until a real provider is configured.
+Phase 3 — Stripe payment reliability
+
+Inspect the current Stripe implementation and complete the safest possible payment setup.
+
+Requirements:
+
+Confirm whether Stripe is in test mode or live mode.
+Do not enable live payments until the complete test transaction succeeds.
+Create Stripe Checkout Sessions or Payment Intents only on the backend.
+Calculate all of the following on the backend:
+Menu-item price
+Quantity
+Subtotal
+Discount
+Delivery fee
+Tax
+Tip
+Platform commission
+Final total
+Never trust prices or totals sent from the frontend.
+Validate the chef, menu item, inventory, schedule, service area, minimum order and ordering status immediately before creating payment.
+Add idempotency protection so duplicate clicks or repeated requests cannot create duplicate orders or payments.
+Implement and verify Stripe webhooks for the required events, including successful payment, failed payment and refund updates.
+Verify webhook signatures using the Stripe webhook secret.
+An order must not become paid based only on a client redirect or frontend verification.
+Save the Stripe payment or checkout reference with the order.
+Prevent the same payment from creating multiple orders.
+Test a failed payment and verify that no paid order is created.
+Test a successful Stripe test payment and verify that:
+Stripe records the payment.
+The webhook is received.
+The order is created or updated once.
+The correct amount is saved.
+Inventory is reduced once.
+The customer sees the confirmed order.
+The chef sees the same order.
+The admin sees the same order.
+Test a refund in Stripe test mode and verify that both Stripe and the DishBar order record show the refund correctly.
+
+Stripe Connect and chef payouts:
+
+Determine honestly whether Stripe Connect accounts, onboarding, transfers and payout controls are genuinely implemented.
+Do not call a normal Stripe Checkout integration “Stripe Connect.”
+If Connect cannot be safely completed and verified tonight, disable automatic chef payouts.
+Use a clearly labelled manual pilot payout process.
+Record:
+Gross sale
+Tax
+Tip
+Delivery fee
+Platform commission
+Refunds
+Net amount owed to the chef
+Payout status
+Do not show chefs a “Request payout” feature unless it creates a real, traceable admin workflow.
+Phase 4 — Real chef and menu data
+
+Remove all fake public marketplace information, including:
+
+Demo chefs
+Fake menu items
+Fake reviews
+Fake ratings
+Fake customer counts
+Fake orders
+Fake earnings
+Fake delivery estimates
+Fake testimonials
+Placeholder addresses
+Misleading verification badges
+
+Keep test data only in a clearly separated test environment.
+
+Create or prepare one real pilot-chef profile for Chef Noushin with editable fields for:
+
+Display name
+Kitchen name
+Biography
+Profile photograph
+Kitchen or food photographs
+City
+Postal code
+Pickup address, hidden from the public until an order is confirmed
+Languages
+Cuisine
+Pickup availability
+Self-delivery availability
+Delivery radius
+Preparation lead time
+Food-handler certification status
+Public-health approval status
+Allergen information
+Menu
+Quantity available
+Order cutoff time
+Available date
+Price
+Portion description
+Ingredients
+Dietary tags
+Reheating and storage instructions
+
+Do not invent certifications, approvals, reviews or ratings.
+
+Create an admin checklist showing which chef-compliance items are verified, pending or missing.
+
+A chef must remain hidden from public ordering until approved by an admin.
+
+Phase 5 — Inventory and ordering controls
+
+Implement and verify real inventory controls.
+
+Requirements:
+
+Every menu item must have:
+Available quantity
+Available date
+Ordering cutoff
+Active or inactive status
+Sold-out state
+Inventory must be checked immediately before payment.
+Inventory must be reduced only after confirmed payment.
+Failed or abandoned payments must not permanently reduce inventory.
+Refunds and cancellations must follow an explicit inventory-restoration rule.
+Two customers must not be able to buy the final portion.
+Prevent negative inventory.
+Display “Sold out” automatically when quantity reaches zero.
+Prevent customers from ordering inactive, expired or unavailable menu items through direct API requests.
+Add pilot controls for:
+Maximum daily orders
+Minimum order amount
+Ordering days
+Ordering hours
+Emergency ordering pause
+Allowed pickup or delivery dates
+Chef preparation capacity
+Test ordering the final available portion and confirm that the next attempted order is blocked.
+Phase 6 — Address validation and delivery fees
+
+Remove the city-name coordinate approximation as the primary delivery calculation.
+
+Implement real address validation and geocoding using an available, legitimate provider.
+
+Requirements:
+
+Validate the customer’s complete address.
+Obtain coordinates for both the chef and customer addresses.
+Save normalized address details.
+Reject addresses that cannot be validated.
+Confirm that the delivery address is inside the pilot delivery area.
+Calculate realistic travel distance. Prefer road distance when the chosen provider supports it.
+Clearly display:
+Validated address
+Estimated distance
+Delivery fee
+Delivery option
+Estimated delivery window
+Calculate the final fee again on the backend.
+Do not rely on a frontend-only Haversine calculation.
+Pickup must remain free.
+Make the pilot delivery formula configurable in the admin panel.
+Do not promise third-party courier delivery unless a courier integration actually exists.
+For tonight’s pilot, support only:
+Customer pickup
+Chef self-delivery
+Disable misleading third-party-delivery options.
+
+If an external geocoding API key is required, implement the integration completely, add the exact environment-variable name, and clearly identify the single user action needed to add the key.
+
+Phase 7 — Complete order workflow
+
+Implement and verify one consistent order lifecycle:
+
+Payment pending
+Paid
+Awaiting chef acceptance
+Accepted
+Preparing
+Ready for pickup or delivery
+Out for delivery, when applicable
+Completed
+Rejected
+Cancelled
+Refund pending
+Refunded
+
+Requirements:
+
+Define who can perform each status change.
+Prevent invalid status transitions.
+Record the timestamp and actor for every status change.
+A chef must not change payment status.
+A customer must not mark an order completed or refunded.
+An admin must be able to intervene.
+Chef rejection must trigger the defined cancellation and refund process.
+Display one consistent status to the customer, chef and admin.
+Maintain an order activity log.
+Include customer name, email, telephone number, delivery or pickup details, instructions, allergies and ordered items.
+Hide unnecessary personal information from public views.
+Phase 8 — Notifications and communication
+
+Implement the minimum notifications necessary for the pilot.
+
+At minimum:
+
+Chef receives a real notification of a new paid order.
+Customer receives confirmation of a successful order.
+Customer receives updates when the chef accepts, rejects, prepares, readies and completes the order.
+Admin receives notice of payment failures, refund requests and order disputes.
+
+Use email when push or SMS is not genuinely configured.
+
+Requirements:
+
+Clearly identify the provider being used.
+Record notification success or failure.
+Do not claim an email, SMS or push notification was sent unless the provider confirms it.
+Keep in-app notifications synchronized with real order events.
+If messaging remains enabled, protect it by order ownership and role permissions.
+Do not expose customer or chef contact details unnecessarily.
+Phase 9 — Refunds, cancellations and disputes
+
+Implement a real pilot process.
+
+Requirements:
+
+The admin can view a refund request and its reason.
+Refund amounts must be calculated and initiated on the backend.
+Save the Stripe refund ID and status.
+Prevent duplicate refunds.
+Support full refunds first. Only retain partial refunds if they are genuinely implemented and tested.
+Update the order and financial records from Stripe webhook events.
+Record who requested, approved and processed the refund.
+Add a simple dispute record with status, notes, order reference and admin action.
+Make the published cancellation policy consistent with actual system behaviour.
+Phase 10 — Taxes, commissions and financial records
+
+For the private pilot:
+
+Make the tax rate configurable.
+Do not automatically charge GST/HST unless the platform has been instructed to do so and the configured tax treatment is correct.
+Display tax separately at checkout.
+Store tax separately in the database.
+Store tips separately and assign them according to the pilot policy.
+Store delivery fees separately.
+Store platform commission separately.
+Store the chef’s net payable separately.
+Ensure refunds reverse the appropriate financial components.
+Add a downloadable pilot order and payout report for the admin.
+Clearly label the financial report as operational data, not formal accounting or tax advice.
+Phase 11 — Legal and trust pages
+
+Review every legal and trust page currently in the application.
+
+Requirements:
+
+Remove placeholder text and irrelevant template language.
+Keep a visible “Draft — legal review required” notice until professional review is completed.
+Ensure the pages accurately describe the features that actually exist.
+Do not claim:
+Guaranteed food safety
+DishBar inspection when none occurred
+Automatic chef payouts if payouts are manual
+Third-party delivery integration if none exists
+SMS notifications if none are sent
+Clearly explain:
+DishBar’s role as a marketplace
+Chef responsibilities
+Customer allergy responsibilities
+Pickup and delivery responsibilities
+Cancellation and refund process
+Privacy and data use
+Support contact process
+Add required acceptance checkboxes during chef application and customer checkout.
+Save the accepted policy version and timestamp.
+Add a configurable support email and display it consistently.
+Do not publish a fake business address or phone number.
+Phase 12 — Chef compliance and food-safety controls
+
+Create an operational compliance workflow for the pilot.
+
+The chef application must capture:
+
+Legal name
+Kitchen or business name
+Address
+Municipality
+Public-health-unit jurisdiction
+Food-handler certificate and expiry date
+Public-health notification or inspection status
+Municipal or zoning confirmation status
+Liability-insurance status
+Identification status
+Banking or payout status
+Agreement acceptance
+Allergen procedure
+Food-preparation and storage procedure
+
+Requirements:
+
+Store uploaded documents securely and privately.
+Do not expose document URLs publicly.
+Only authorized admins may view verification documents.
+Admin approval must require a checklist.
+Do not automatically mark any document as verified.
+Add expiry reminders for time-limited documents.
+For the tonight pilot, allow the admin to mark requirements as:
+Verified
+Pending
+Not provided
+Not applicable
+Keep ordering disabled until the chef is explicitly approved.
+
+If secure file storage is not available, disable public document upload and clearly state the required integration instead of pretending files are safely stored.
+
+Phase 13 — Security and privacy review
+
+Perform and document tests for:
+
+Broken access control
+ID enumeration
+Direct API access
+Customer-order isolation
+Chef-order isolation
+Admin authorization
+SQL injection
+Cross-site scripting
+CSRF where relevant
+File-upload restrictions
+Malicious filenames
+Unsupported file types
+Oversized uploads
+Rate limiting
+Login brute-force protection
+Secret exposure
+Environment-variable exposure
+Payment-price manipulation
+Duplicate payment requests
+Duplicate webhook events
+Sensitive data in logs
+Public exposure of private addresses
+Error messages leaking internals
+
+Requirements:
+
+Fix critical and high-risk issues.
+Add structured server-side logging without logging passwords, full payment details or unnecessary personal data.
+Add safe user-facing error messages.
+Add rate limiting to authentication, checkout, messaging and admin-sensitive endpoints.
+Ensure Stripe secret keys and webhook secrets are never included in frontend code.
+Confirm production debug mode is disabled.
+Confirm database SSL settings work with the current hosting provider.
+Re-test the previous asyncpg sslmode bug.
+Phase 14 — Pilot user experience
+
+Review the complete mobile and desktop experience.
+
+The homepage must make it clear that DishBar is operating as a limited private pilot.
+
+Include:
+
+Pilot notice
+Current service area
+Available ordering dates
+Pickup or self-delivery options
+Support contact
+Become-a-chef link, which may collect applications without automatically publishing chefs
+
+Customer checkout must clearly show:
+
+Chef
+Items
+Quantity
+Subtotal
+Discount
+Delivery fee
+Tax
+Tip
+Final total
+Pickup or delivery choice
+Validated address
+Delivery instructions
+Allergens acknowledgement
+Cancellation policy
+Payment method
+Order date and estimated time
+
+Remove or disable dead links, fake counters, buttons with no action, empty dashboards and misleading features.
+
+Phase 15 — End-to-end tests
+
+Run and report the actual results of these tests:
+
+Customer test
+Register a new pilot customer.
+Log in and log out.
+Browse the real chef.
+View a real menu.
+Add an available item to the cart.
+Change quantity.
+Attempt to exceed inventory.
+Choose pickup.
+Choose delivery.
+Enter an invalid address.
+Enter an out-of-area address.
+Enter a valid address.
+Confirm delivery fee.
+Attempt checkout without accepting required terms.
+Complete a Stripe test payment.
+Confirm order appears in the customer account.
+Confirm receipt or email is delivered.
+Confirm order tracking updates.
+Confirm the customer cannot see another customer’s order.
+Chef test
+Log in as the pilot chef.
+Confirm only the chef’s own orders are visible.
+Accept the order.
+Change it to preparing.
+Change it to ready.
+Complete pickup or self-delivery.
+Verify the customer sees each valid status.
+Confirm inventory is correct.
+Confirm earnings calculations are correct.
+Confirm the chef cannot access admin controls.
+Admin test
+Log in as an admin.
+Confirm a customer cannot access the same admin route.
+Pause ordering.
+Confirm customers cannot place new orders.
+Resume ordering.
+View the order.
+Review the complete activity log.
+Issue a Stripe test refund.
+Confirm the refund webhook updates the order.
+Confirm the financial records update.
+Confirm the admin can suspend a chef.
+Confirm a suspended chef cannot accept new orders.
+Failure tests
+
+Test and report:
+
+Failed card
+Abandoned checkout
+Duplicate checkout click
+Duplicate webhook
+Out-of-stock item
+Inactive menu item
+Unapproved chef
+Ordering outside allowed hours
+Daily order limit reached
+Invalid coupon
+Expired coupon
+Unauthorized API request
+Server restart during an order
+Notification-provider failure
+Geocoding-provider failure
+Phase 16 — Publish only the verified pilot build
+
+After all critical pilot tests pass:
+
+Create a final version with a clear name such as:
+“DishBar Private Pilot — Verified Build”
+Ensure it includes every security fix from prior versions and the new food images.
+Make that verified version the live application version.
+Confirm the live URL opens successfully on desktop and mobile.
+Confirm the live site uses the latest version, not Version 11 or another older build.
+Keep live payments disabled until the user explicitly provides and approves live Stripe credentials.
+Keep the app visibly in private-pilot mode.
+Do not publish if any of these remain unresolved:
+Admin APIs accessible to non-admin users
+Payment confirmation without webhook verification
+Incorrect prices or totals
+Inventory overselling
+Exposure of private information
+Fake public data
+Broken order workflow
+No reliable way for the chef to receive a new-order notice
+Required final report
+
+At the end, provide a concise but complete report containing:
+
+1. Verified working
+
+List only features that were directly tested successfully.
+
+2. Fixed issues
+
+For every fix, provide:
+
+Problem
+Root cause
+Files or components changed
+Test performed
+Result
+3. Remaining limitations
+
+Identify anything that remains manual, simulated, UI-only, untested or dependent on an external service.
+
+4. Required user actions
+
+List only actions that cannot be completed without me, such as:
+
+Adding a specific API key
+Entering the real chef information
+Uploading genuine compliance documents
+Approving legal language
+Providing the support email
+Activating Stripe live mode
+
+For every required action, give the exact page, field or environment-variable name.
+
+5. Test evidence
+
+Provide the results of every end-to-end test, including failed tests and error messages.
+
+6. Pilot recommendation
+
+Choose exactly one conclusion:
+
+READY FOR PRIVATE PILOT
+READY ONLY AFTER LISTED USER ACTIONS
+NOT READY FOR PRIVATE PILOT
+
+Explain the conclusion honestly.
+
+Begin now by creating a backup and auditing the currently deployed Version 12 against the backend and security fixes from Version 11. Continue automatically through all phases. Do not stop to ask general questions. Only ask me for information when a required external credential or genuine business detail makes progress impossible.

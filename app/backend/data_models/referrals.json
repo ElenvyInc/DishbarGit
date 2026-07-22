@@ -1,0 +1,35 @@
+{
+    "title": "referrals",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "referral_code": {
+            "type": "string",
+            "maxLength": 20
+        },
+        "referred_user_id": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "reward_amount": {
+            "type": "number",
+            "default": 5.0
+        },
+        "status": {
+            "type": "string",
+            "maxLength": 50,
+            "default": "pending",
+            "description": "pending, completed, expired"
+        }
+    },
+    "required": [
+        "id",
+        "user_id",
+        "referral_code"
+    ]
+}

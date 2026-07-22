@@ -1,0 +1,148 @@
+A **400 error means the checkout request reached the backend, but the backend rejected the information sent by the “Place Order” button**. This is usually caused by missing fields, incorrect request formatting, an invalid menu item/chef ID, inventory validation, postal-code rules, or payment configuration.
+
+Paste this directly into Atoms for Alex:
+
+```text
+@Alex
+
+The “Place Order” button on the Checkout page is failing with HTTP status 400.
+
+Do not make assumptions and do not only change the UI. Debug the real frontend-to-backend order request step by step.
+
+Please complete the following:
+
+1. Reproduce the error
+- Open the current Checkout page.
+- Add the existing item “ASH SHOLE GHALAMKAR.”
+- Select Pickup.
+- Complete all required customer information.
+- Check the allergen acknowledgement.
+- Click “Place Order.”
+- Capture the exact request URL, request payload, response status and full backend error response.
+
+2. Identify the exact source of the 400 response
+Inspect:
+- Browser Network request
+- Frontend console
+- Backend logs
+- API validation errors
+- Database lookup errors
+
+Show the exact error message before making changes.
+
+3. Verify the checkout payload matches the backend schema
+Confirm that the frontend sends every required field using the exact field names and data types expected by the backend, including:
+- chef_id
+- menu_item_id
+- quantity
+- customer full name
+- email
+- phone
+- fulfillment method
+- pickup or delivery selection
+- delivery address and postal code only when required
+- delivery instructions
+- allergen acknowledgement
+- terms acceptance
+- calculated subtotal
+- service fee
+- total amount
+
+Do not trust totals sent by the frontend. Calculate and validate all prices on the backend.
+
+4. Check Pickup logic
+Pickup is currently selected, so the backend must not require:
+- delivery address
+- delivery postal code
+- delivery coordinates
+- delivery fee
+- delivery-zone validation
+
+Only require those fields when Chef Delivery or Third-Party Delivery is selected.
+
+5. Check the real database records
+Confirm:
+- The displayed menu item exists in the database.
+- The item has a valid menu_item_id.
+- The item belongs to a real chef.
+- The chef account exists and is approved/active.
+- The item is active and available.
+- Inventory or max-orders availability is greater than zero.
+- The displayed price matches the database price.
+
+If the checkout is displaying stale, mock or deleted data, replace it with a valid database record. Do not silently create fake production data.
+
+6. Check pilot restrictions
+Verify whether the request is being rejected because of:
+- ordering hours
+- allowed ordering days
+- daily order limit
+- minimum order amount
+- pilot postal codes
+- chef approval
+- inactive menu item
+- unavailable inventory
+
+For Pickup orders, postal-code restrictions should not block the order unless this is an intentional documented rule.
+
+7. Check authentication
+Verify whether order creation requires a logged-in customer.
+If authentication is required:
+- Show a clear “Please sign in to place your order” message.
+- Preserve the customer’s cart after login.
+
+Do not return a generic 400 error for authentication problems. Use the correct 401 or 403 response.
+
+8. Check payment logic
+Determine whether clicking “Place Order” should:
+- create an unpaid order,
+- create a Stripe PaymentIntent,
+- or open a Stripe payment form.
+
+Confirm STRIPE_SECRET_KEY and related configuration exist.
+
+If Stripe is not configured, do not create a false successful order. Show a clear pilot message explaining that online payment is temporarily unavailable.
+
+9. Improve error handling
+Replace the silent or generic failure with a customer-friendly message based on the backend response, such as:
+- “This item is no longer available.”
+- “Pickup information is incomplete.”
+- “Please sign in before placing your order.”
+- “Online payment is not configured yet.”
+- “Ordering is currently paused.”
+- “The selected quantity is unavailable.”
+
+Keep the detailed technical error in the console and backend logs.
+
+10. Test after fixing
+Test these cases and report the real results:
+- Pickup order with valid information
+- Chef Delivery with missing address
+- Chef Delivery with valid address
+- Unauthenticated customer
+- Inactive menu item
+- Sold-out item
+- Ordering outside permitted hours
+- Duplicate button click
+- Stripe failure
+
+Final response must include:
+- Exact root cause
+- Files changed
+- API endpoint repaired
+- Before-and-after request payload
+- Actual response status after the fix
+- Evidence that one full Pickup checkout was completed successfully
+
+Use these status labels honestly:
+VERIFIED WORKING
+IMPLEMENTED BUT NOT FULLY TESTED
+BLOCKED BY EXTERNAL CONFIGURATION
+FAILED
+
+Do not claim the Place Order workflow works unless you personally complete and verify a test order.
+```
+
+Also, your screenshot shows **Pickup**, but the backend may still be demanding delivery-related information. That is one of the most likely causes. Another strong possibility is that “ASH SHOLE GHALAMKAR” is still connected to a mock or invalid menu record after the redesign.
+
+Do not spend money on Google Ads until the complete order flow reaches a confirmed success page and creates a valid order in the admin dashboard.

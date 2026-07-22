@@ -1,0 +1,29 @@
+{
+    "title": "platform_settings",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "key": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Setting key name"
+        },
+        "value": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Setting value (JSON or plain text)"
+        },
+        "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Human-readable description of the setting"
+        }
+    },
+    "required": [
+        "id",
+        "key",
+        "value"
+    ]
+}

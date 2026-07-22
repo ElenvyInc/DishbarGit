@@ -1,0 +1,65 @@
+{
+    "title": "menu_items",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "chef_id": {
+            "type": "integer"
+        },
+        "title": {
+            "type": "string",
+            "maxLength": 200
+        },
+        "title_fa": {
+            "type": "string",
+            "maxLength": 200
+        },
+        "description": {
+            "type": "string",
+            "maxLength": 1000
+        },
+        "description_fa": {
+            "type": "string",
+            "maxLength": 1000
+        },
+        "price": {
+            "type": "number"
+        },
+        "image_url": {
+            "type": "string",
+            "maxLength": 500
+        },
+        "category": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "dietary_tags": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "halal,vegetarian,vegan,gluten_free"
+        },
+        "is_available": {
+            "type": "boolean",
+            "default": true
+        },
+        "available_date": {
+            "type": "string",
+            "format": "date"
+        },
+        "max_orders": {
+            "type": "integer",
+            "default": 20
+        }
+    },
+    "required": [
+        "user_id",
+        "chef_id",
+        "title",
+        "price"
+    ]
+}

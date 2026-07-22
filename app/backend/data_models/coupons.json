@@ -1,0 +1,47 @@
+{
+    "title": "coupons",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "code": {
+            "type": "string",
+            "maxLength": 50
+        },
+        "discount_percent": {
+            "type": "number"
+        },
+        "discount_amount": {
+            "type": "number"
+        },
+        "min_order_amount": {
+            "type": "number",
+            "default": 0
+        },
+        "max_uses": {
+            "type": "integer",
+            "default": 100
+        },
+        "used_count": {
+            "type": "integer",
+            "default": 0
+        },
+        "is_active": {
+            "type": "boolean",
+            "default": true
+        },
+        "expires_at": {
+            "type": "string",
+            "format": "date"
+        },
+        "chef_id": {
+            "type": "integer",
+            "description": "null means platform-wide coupon"
+        }
+    },
+    "required": [
+        "id",
+        "code"
+    ]
+}

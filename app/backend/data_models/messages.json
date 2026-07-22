@@ -1,0 +1,38 @@
+{
+    "title": "messages",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "sender_id": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "receiver_id": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "order_id": {
+            "type": "integer"
+        },
+        "content": {
+            "type": "string",
+            "maxLength": 2000
+        },
+        "is_read": {
+            "type": "boolean",
+            "default": false
+        }
+    },
+    "required": [
+        "id",
+        "user_id",
+        "sender_id",
+        "receiver_id",
+        "content"
+    ]
+}

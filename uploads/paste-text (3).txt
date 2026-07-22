@@ -1,0 +1,378 @@
+CEO Product Direction — DishBar V2
+
+You are no longer acting as a software engineer.
+
+You are now the Chief Product Officer, UX Director, Brand Strategist, Marketplace Expert, Growth Advisor, and Customer Experience Lead for DishBar.
+
+Before making any changes, understand the business model.
+
+What DishBar Is
+
+DishBar is NOT:
+
+a restaurant
+a meal prep company
+Uber Eats
+SkipTheDishes
+a Persian food company
+
+DishBar IS:
+
+A trusted marketplace connecting local home chefs with customers looking for authentic homemade meals.
+
+DishBar creates economic opportunities for home chefs while helping customers discover fresh homemade food prepared by trusted people in their communities.
+
+Every design decision must reinforce this message.
+
+Your Mission
+
+Forget how the application looks today.
+
+Audit every page and redesign the product experience from first principles.
+
+Ask yourself continuously:
+
+"If I landed on this page for the first time, would I immediately understand that DishBar connects people—not sells food?"
+
+If the answer is no, redesign it.
+
+First Impression Rule
+
+Within FIVE seconds every visitor must understand three things.
+
+1.
+
+What is DishBar?
+
+A marketplace connecting local home chefs with customers.
+
+2.
+
+Why should I trust it?
+
+Verified chefs.
+
+Safe platform.
+
+Secure payments.
+
+Transparent reviews.
+
+Community.
+
+3.
+
+Which user am I?
+
+The homepage must immediately split users into two journeys.
+
+🍳
+
+Become a Home Chef
+
+Earn income doing what you love.
+
+🍽️
+
+Find Homemade Meals
+
+Discover authentic meals prepared by trusted local chefs.
+
+These two buttons become the primary calls to action throughout the platform.
+
+Homepage
+
+Completely redesign the homepage.
+
+It should NOT resemble a restaurant website.
+
+Instead it should resemble Airbnb or Etsy.
+
+The homepage should tell a story.
+
+Order:
+
+Hero
+
+↓
+
+How DishBar Works
+
+↓
+
+Become a Chef
+
+↓
+
+Browse Local Chefs
+
+↓
+
+Popular Meals
+
+↓
+
+Featured Home Chef
+
+↓
+
+Customer Testimonials
+
+↓
+
+Safety & Trust
+
+↓
+
+FAQ
+
+↓
+
+Download App
+
+↓
+
+Footer
+
+Hero Section
+
+Replace the current restaurant-style hero.
+
+Current:
+
+Large food photo + Order Now
+
+Replace with:
+
+A welcoming local home chef handing a meal to a delivery driver while another family happily receives homemade food.
+
+Headline:
+
+"Homemade meals. Local home chefs. One trusted marketplace."
+
+Subheadline:
+
+"Discover talented home chefs near you or turn your passion for cooking into income."
+
+Buttons:
+
+🍳 Become a Home Chef
+
+🍽️ Browse Meals
+
+Navigation
+
+Improve navigation.
+
+Customers
+
+Chefs
+
+How it Works
+
+Become a Chef
+
+Blog
+
+Safety
+
+Support
+
+Login
+
+Sign Up
+
+Homepage Experience
+
+Reduce emphasis on food.
+
+Increase emphasis on people.
+
+Every section should answer:
+
+Who made this food?
+
+Why should I trust them?
+
+What makes DishBar different?
+
+Trust
+
+Build trust visually.
+
+Verified badges
+
+Chef stories
+
+Completed orders
+
+Food safety
+
+Customer reviews
+
+Response rate
+
+Repeat customers
+
+Food Handler Certificate
+
+Chef Profiles
+
+Every chef has their own storefront.
+
+Story.
+
+Personality.
+
+Cooking philosophy.
+
+Languages.
+
+Specialties.
+
+Availability.
+
+Neighborhood.
+
+Delivery area.
+
+Repeat customer rate.
+
+Visual Design
+
+Remove dark restaurant atmosphere.
+
+Use:
+
+Bright
+
+Friendly
+
+Community-oriented
+
+Natural lighting
+
+Real homes
+
+Real kitchens
+
+Real chefs
+
+Real customers
+
+Real delivery moments
+
+Not stock food photography.
+
+Customer Journey
+
+Instead of:
+
+Homepage
+
+↓
+
+Search food
+
+↓
+
+Checkout
+
+Create:
+
+Homepage
+
+↓
+
+Understand DishBar
+
+↓
+
+Browse chefs
+
+↓
+
+Build trust
+
+↓
+
+View menus
+
+↓
+
+Order
+
+Chef Journey
+
+Homepage
+
+↓
+
+Become a Chef
+
+↓
+
+Income Calculator
+
+↓
+
+Registration
+
+↓
+
+Profile
+
+↓
+
+Menu
+
+↓
+
+Go Live
+
+Celebrate milestones.
+
+AI Audit
+
+After redesigning every screen, review the entire platform again.
+
+List:
+
+Every confusing page.
+
+Every weak headline.
+
+Every unnecessary feature.
+
+Every missing trust element.
+
+Every conversion improvement.
+
+Implement all high-impact improvements before stopping.
+
+Do not simply make the website prettier.
+
+Transform DishBar into the most trustworthy home-chef marketplace in Canada.
+
+Then I would immediately follow it with a second prompt.
+
+This is the prompt I think will add the most business value:
+
+Act as an experienced marketplace founder who has launched platforms like Airbnb, Etsy, Uber, and Fiverr. Audit DishBar from the perspective of both a first-time home chef and a first-time customer. Identify every point where users might hesitate, become confused, or abandon the platform. Redesign those experiences to maximize trust, simplicity, and conversion. Don't add unnecessary features. Remove friction. Every change must increase the likelihood that a visitor becomes either a registered chef or a paying customer. Finish by prioritizing improvements by estimated impact on business growth.
+
+One thing I noticed from your current preview
+
+Your hero still says:
+
+"Authentic Persian Home Cooking, Delivered"
+
+That headline no longer matches the company you're building.
+
+If I were a home cook looking to earn money, I wouldn't realize the platform was for me.
+
+If I had to pick one single change that would increase your chances of success before launch, it would be changing the homepage so that every visitor immediately sees the two clear paths:
+
+🍳 Become a Home Chef
+🍽️ Find Homemade Meals
+
+That one decision aligns the entire product with your actual business model and gives both sides of the marketplace a clear starting point.
