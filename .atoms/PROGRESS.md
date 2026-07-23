@@ -4,6 +4,12 @@
 Production-readiness audit and pilot preparation for DishBar. One chef, limited customers, Ontario.
 
 ## Task Breakdown
+- [ ] Remove unsupported launch claims, testimonials, ratings, and unsafe payment/verification wording
+- [ ] Complete trilingual homepage copy, persistent locale behavior, and Persian RTL
+- [ ] Repair marketplace, onboarding, authentication, CTA, and footer navigation
+- [ ] Complete trilingual Ontario launch legal pages and page metadata
+- [ ] Add launch-safe homepage and route SEO, canonical, Open Graph, sitemap, and robots
+- [ ] Validate claims, translations, links, desktop/mobile rendering, lint, and production build
 - [x] Complete production audit and create honest checklist
 - [x] Implement pilot mode with admin controls (platform settings table + API)
 - [x] Add platform_settings backend table and admin settings API
