@@ -58,3 +58,4 @@ Production-readiness audit and pilot preparation for DishBar. One chef, limited 
 - 2026-08-05: Remaining gates: auth provider/runtime settings, Stripe webhook/idempotency/refund verification, real Chef Noushin pilot data, legal review, SEO/canonical deployment configuration, email, delivery-area validation, and full build/E2E testing.
 - 2026-08-05: Updated pilot metadata to the approved Ontario launch message, changed the author from Atoms to DishBar, and set the pilot page to noindex/nofollow.
 - 2026-08-05: Hardened Stripe flows with signed webhook verification, payment-session ownership checks, and Stripe request idempotency keys; database-level duplicate-order handling still requires end-to-end validation.
+- 2026-08-05: Python AST syntax verification passed for main.py, admin.py, orders.py, chefs.py, and payments.py. Full frontend build/E2E testing remains pending because no CI workflow is configured.
