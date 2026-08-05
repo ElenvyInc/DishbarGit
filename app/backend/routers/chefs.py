@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from services.chefs import ChefsService
-from dependencies.auth import get_current_user
+from dependencies.auth import get_current_user, get_admin_user
 from schemas.auth import UserResponse
 
 # Set up logging
@@ -157,6 +157,7 @@ async def query_chefss_all(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=2000, description="Max number of records to return"),
     fields: str = Query(None, description="Comma-separated list of fields to return"),
+     current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     # Query chefss with filtering, sorting, and pagination without user limitation
