@@ -9,7 +9,7 @@ from sqlalchemy import select, func, update, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from dependencies.auth import get_current_user
+from dependencies.auth import get_admin_user
 from schemas.auth import UserResponse
 from models.chefs import Chefs
 from models.orders import Orders
@@ -21,9 +21,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
-# Note: In production, add admin role check middleware.
-# For MVP, any authenticated user accessing /admin routes is treated as admin.
-# Real role-based access should be implemented via user metadata/roles.
+# All admin routes require the backend-enforced admin role.
 
 
 class AdminStatsResponse(BaseModel):
@@ -79,7 +77,7 @@ COMMISSION_RATE = 0.15
 
 @router.get("/stats", response_model=AdminStatsResponse)
 async def get_admin_stats(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get admin dashboard statistics"""
@@ -156,7 +154,7 @@ async def list_all_chefs(
     status: Optional[str] = Query(None, description="pending, approved, suspended"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all chefs with optional status filter"""
@@ -205,7 +203,7 @@ async def list_all_chefs(
 @router.post("/chefs/approve")
 async def approve_or_suspend_chef(
     data: ChefApprovalRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Approve or suspend a chef"""
@@ -237,7 +235,7 @@ async def list_all_orders(
     status: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all orders with optional status filter"""
@@ -283,7 +281,7 @@ async def list_all_orders(
 @router.post("/orders/refund")
 async def process_refund(
     data: RefundRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Process a refund for an order"""
@@ -326,7 +324,7 @@ async def process_refund(
 async def list_all_reviews(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all reviews for moderation"""
@@ -364,7 +362,7 @@ async def list_all_reviews(
 @router.delete("/reviews/{review_id}")
 async def delete_review(
     review_id: int,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a review (moderation)"""
@@ -387,7 +385,7 @@ async def delete_review(
 @router.post("/notifications/send")
 async def send_notification(
     data: SendNotificationRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Send notification to a user or broadcast"""
@@ -412,7 +410,7 @@ async def send_notification(
 @router.post("/coupons")
 async def create_coupon(
     data: CouponCreateRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new coupon"""
@@ -438,7 +436,7 @@ async def create_coupon(
 
 @router.get("/coupons")
 async def list_coupons(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all coupons"""
@@ -470,7 +468,7 @@ async def list_coupons(
 @router.delete("/coupons/{coupon_id}")
 async def delete_coupon(
     coupon_id: int,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a coupon"""
