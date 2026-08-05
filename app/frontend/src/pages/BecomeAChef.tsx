@@ -130,8 +130,8 @@ export default function BecomeAChef() {
                   className="cursor-pointer"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>5 meals</span>
-                  <span>60 meals</span>
+                  <span>5 {t('mealsUnit')}</span>
+                  <span>60 {t('mealsUnit')}</span>
                 </div>
               </div>
 
@@ -250,10 +250,10 @@ export default function BecomeAChef() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <DishBarLogo size="sm" />
           <p className="text-sm text-muted-foreground">
-            © 2026 DishBar. A marketplace for homemade food in Ontario, Canada.
+            © 2026 DishBar. {t('footerBody')}
           </p>
           <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="cursor-pointer">
-            ← Back to Home
+            ← {t('backHome')}
           </Button>
         </div>
       </footer>
