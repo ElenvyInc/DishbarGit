@@ -68,7 +68,12 @@ async def lifespan(app: FastAPI):
 
     # MODULE_STARTUP_START
     await initialize_database()
-    await initialize_mock_data()
+    environment = os.getenv("ENVIRONMENT", "prod").lower()
+    enable_mock_data = os.getenv("ENABLE_MOCK_DATA", "false").lower() == "true"
+    if environment != "prod" and enable_mock_data:
+        await initialize_mock_data()
+    else:
+        logger.info("Mock data initialization disabled; use ENABLE_MOCK_DATA=true only in non-production environments")
     await initialize_admin_user()
     # MODULE_STARTUP_END
 
