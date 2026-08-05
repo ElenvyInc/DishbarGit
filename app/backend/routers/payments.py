@@ -406,7 +406,14 @@ async def create_payment_session(
         if data.customer_email and data.customer_email.strip():
             stripe_params["customer_email"] = data.customer_email.strip()
 
-        session = stripe.checkout.Session.create(**stripe_params)
+        # Use a stable idempotency key so retries cannot create duplicate Stripe sessions.
+        idempotency_key = request.headers.get("Idempotency-Key") or f"dishbar-order-{order_id}"
+        if len(idempotency_key) > 255:
+            raise HTTPException(status_code=400, detail="Idempotency-Key is too long")
+        session = stripe.checkout.Session.create(
+            idempotency_key=idempotency_key,
+            **stripe_params,
+        )
 
         # Save session ID to order
         result = await db.execute(select(Orders).where(Orders.id == order_id))
@@ -430,6 +437,64 @@ async def create_payment_session(
         raise HTTPException(status_code=500, detail=f"Failed to create payment session: {str(e)}")
 
 
+@router.post("/webhook")
+async def stripe_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Process signed Stripe checkout events idempotently."""
+    webhook_secret = getattr(settings, "stripe_webhook_secret", "")
+    if not webhook_secret:
+        raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
+
+    payload = await request.body()
+    signature = request.headers.get("Stripe-Signature")
+    if not signature:
+        raise HTTPException(status_code=400, detail="Stripe-Signature header is required")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, webhook_secret)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid Stripe webhook payload")
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature")
+
+    event_type = event["type"]
+    if event_type not in {
+        "checkout.session.completed",
+        "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed",
+        "checkout.session.expired",
+    }:
+        return {"received": True, "handled": False}
+
+    session = event["data"]["object"]
+    metadata = session.get("metadata") or {}
+    order_id = metadata.get("order_id")
+    if not order_id:
+        return {"received": True, "handled": False}
+
+    result = await db.execute(select(Orders).where(Orders.id == int(order_id)))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if event_type in {"checkout.session.completed", "checkout.session.async_payment_succeeded"}:
+        order.payment_status = "paid"
+        order.status = "confirmed"
+    elif event_type == "checkout.session.async_payment_failed":
+        order.payment_status = "payment_failed"
+    elif event_type == "checkout.session.expired" and order.payment_status != "paid":
+        order.payment_status = "expired"
+        order.status = "cancelled"
+
+    if not order.stripe_session_id:
+        order.stripe_session_id = session.get("id")
+    await db.commit()
+
+    return {"received": True, "handled": True, "order_id": order.id, "payment_status": order.payment_status}
+
+
 @router.post("/verify_payment", response_model=VerifyResponse)
 async def verify_payment(
     data: VerifyRequest,
@@ -446,6 +511,9 @@ async def verify_payment(
                 select(Orders).where(Orders.id == int(order_id))
             )
             order = result.scalar_one_or_none()
+
+            if order and str(order.user_id) != str(current_user.id) and current_user.role != "admin":
+                raise HTTPException(status_code=403, detail="You do not have access to this payment session")
 
             if order:
                 status_mapping = {"complete": "paid", "open": "pending", "expired": "cancelled"}
