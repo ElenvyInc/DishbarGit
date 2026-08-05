@@ -5,8 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import {
-  ChefHat, DollarSign, Clock, Users, Award, ShieldCheck,
-  Star, Heart, ArrowRight, CheckCircle2
+  ChefHat, DollarSign, Clock, Users, Award,
+  ArrowRight
 } from 'lucide-react';
 import { client, t, getLocale } from '@/lib/api';
 import DishBarLogo from '@/components/DishBarLogo';
@@ -18,7 +18,7 @@ export default function BecomeAChef() {
   const [mealsPerWeek, setMealsPerWeek] = useState(20);
   const [avgPrice, setAvgPrice] = useState(18);
 
-  const monthlyEarnings = Math.round(mealsPerWeek * avgPrice * 0.85 * 4.33);
+  const monthlyEarnings = Math.round(mealsPerWeek * avgPrice * 4.33);
 
   const benefits = [
     {
@@ -44,34 +44,9 @@ export default function BecomeAChef() {
   ];
 
   const steps = [
-    { num: 1, title: 'Create Your Profile', desc: 'Tell us about yourself, your cooking style, and your specialties. Upload photos of your kitchen and signature dishes.' },
-    { num: 2, title: 'Set Up Your Menu', desc: 'Add your dishes with descriptions, prices, and availability. You control everything — from portions to delivery options.' },
-    { num: 3, title: 'Get Verified', desc: 'Upload your Food Handler Certificate and complete our quick safety checklist. We verify your identity for customer trust.' },
-    { num: 4, title: 'Go Live & Earn', desc: 'Once approved, your storefront goes live. Start receiving orders from hungry customers in your neighbourhood!' },
-  ];
-
-  const successStories = [
-    {
-      name: 'Maryam H.',
-      location: 'Toronto, ON',
-      earnings: '$2,400/month',
-      quote: 'I went from cooking for my family to feeding the whole neighbourhood. DishBar made it possible.',
-      meals: '80+ meals/month',
-    },
-    {
-      name: 'Fatima R.',
-      location: 'Mississauga, ON',
-      earnings: '$1,800/month',
-      quote: 'As a stay-at-home mom, DishBar gave me financial independence without leaving my kids.',
-      meals: '60+ meals/month',
-    },
-    {
-      name: 'Ali K.',
-      location: 'Ottawa, ON',
-      earnings: '$3,200/month',
-      quote: 'I retired from my restaurant job but missed cooking. Now I cook on my own terms.',
-      meals: '100+ meals/month',
-    },
+    { num: 1, title: t('chefStep1'), desc: t('chefStep1Desc') },
+    { num: 2, title: t('chefStep2'), desc: t('chefStep2Desc') },
+    { num: 3, title: t('chefStep3'), desc: t('chefStep3Desc') },
   ];
 
   return (
@@ -94,7 +69,7 @@ export default function BecomeAChef() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <Badge variant="secondary" className="text-sm px-3 py-1.5">
-                🍳 Join 50+ home chefs in Ontario
+                {t('foundingChefs')}
               </Badge>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight">
                 {t('becomeChefTitle')}
@@ -124,7 +99,7 @@ export default function BecomeAChef() {
             </div>
             <img
               src="https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-18/sxv7amacaiza/community-home-chefs-diverse.png"
-              alt="Diverse home chefs community"
+              alt={t('chefAlt')}
               className="w-full rounded-3xl shadow-2xl"
             />
           </div>
@@ -185,7 +160,7 @@ export default function BecomeAChef() {
                   ${monthlyEarnings.toLocaleString()}
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  per month (after 15% platform fee)
+                  {t('calculatorDisclaimer')}
                 </p>
               </div>
 
@@ -227,8 +202,8 @@ export default function BecomeAChef() {
       <section className="py-20 bg-secondary/10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold">How to Get Started</h2>
-            <p className="text-muted-foreground mt-2">From sign-up to your first order in 4 simple steps</p>
+            <h2 className="text-3xl md:text-4xl font-bold">{t('howToApply')}</h2>
+            <p className="text-muted-foreground mt-2">{t('howToApplyDesc')}</p>
           </div>
           <div className="space-y-6">
             {steps.map((step) => (
@@ -246,75 +221,14 @@ export default function BecomeAChef() {
         </div>
       </section>
 
-      {/* Success Stories */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold">Chef Success Stories</h2>
-            <p className="text-muted-foreground mt-2">Real people earning real income from their home kitchens</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {successStories.map((story, i) => (
-              <Card key={i} className="border-border/50">
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    ))}
-                  </div>
-                  <p className="text-muted-foreground italic">"{story.quote}"</p>
-                  <div className="border-t pt-4">
-                    <p className="font-bold">{story.name}</p>
-                    <p className="text-xs text-muted-foreground">{story.location}</p>
-                    <div className="flex gap-4 mt-2">
-                      <Badge variant="secondary" className="text-xs">
-                        💰 {story.earnings}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        🍽️ {story.meals}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Requirements */}
-      <section className="py-20 bg-secondary/20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold">What You Need</h2>
-            <p className="text-muted-foreground mt-2">Simple requirements to get started</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              'A clean, safe home kitchen',
-              'Valid Food Handler Certificate',
-              'Passion for cooking',
-              'Ability to prepare meals consistently',
-              'Smartphone for order management',
-              'Compliance with Ontario Regulation 493/17',
-            ].map((req, i) => (
-              <div key={i} className="flex items-center gap-3 p-4 bg-card rounded-xl border">
-                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
-                <span className="font-medium">{req}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Final CTA */}
       <section className="py-20 bg-primary">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-primary-foreground mb-4">
-            Ready to Start Earning?
+            {t('readyTitle')}
           </h2>
           <p className="text-lg text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
-            Join our community of home chefs and start turning your cooking skills into income today.
+            {t('readyBody')}
           </p>
           <Button
             size="lg"
@@ -326,7 +240,7 @@ export default function BecomeAChef() {
             {t('startEarning')}
           </Button>
           <p className="text-sm text-primary-foreground/60 mt-4">
-            Free to join. No upfront costs. Start earning within days.
+            {t('applicationDisclaimer')}
           </p>
         </div>
       </section>
