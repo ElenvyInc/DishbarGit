@@ -56,3 +56,5 @@ Production-readiness audit and pilot preparation for DishBar. One chef, limited 
 - 2026-08-05: Enforced backend admin role checks on admin routes and broad all-orders/all-chefs endpoints.
 - 2026-08-05: Disabled mock-data initialization by default; it now requires ENABLE_MOCK_DATA=true in a non-production environment.
 - 2026-08-05: Remaining gates: auth provider/runtime settings, Stripe webhook/idempotency/refund verification, real Chef Noushin pilot data, legal review, SEO/canonical deployment configuration, email, delivery-area validation, and full build/E2E testing.
+- 2026-08-05: Updated pilot metadata to the approved Ontario launch message, changed the author from Atoms to DishBar, and set the pilot page to noindex/nofollow.
+- 2026-08-05: Hardened Stripe flows with signed webhook verification, payment-session ownership checks, and Stripe request idempotency keys; database-level duplicate-order handling still requires end-to-end validation.
