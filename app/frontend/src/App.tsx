@@ -14,6 +14,7 @@ import AuditReport from './pages/AuditReport';
 import BecomeAChef from './pages/BecomeAChef';
 import AuthCallback from './pages/AuthCallback';
 import AuthError from './pages/AuthError';
+import AuthPage from './pages/AuthPage';
 import BlogRoutes from './blog-routes';
 
 const queryClient = new QueryClient();
@@ -21,6 +22,8 @@ const queryClient = new QueryClient();
 const AppRoutes = () => (
   <Routes>
     <Route path="/" element={<Index />} />
+    <Route path="/login" element={<AuthPage mode="login" />} />
+    <Route path="/signup" element={<AuthPage mode="signup" />} />
     <Route path="/chef/:id" element={<ChefProfile />} />
     <Route path="/checkout" element={<Checkout />} />
     <Route path="/payment-success" element={<OrderSuccess />} />
