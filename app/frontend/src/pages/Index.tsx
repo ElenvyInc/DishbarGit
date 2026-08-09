@@ -124,8 +124,8 @@ export default function HomePage() {
               <Button variant="ghost" size="sm" onClick={() => navigate('/account')}>{t('myProfile')}</Button>
             ) : (
               <>
-                <Button variant="ghost" size="sm" onClick={() => client.auth.toLogin()}>{t('login')}</Button>
-                <Button size="sm" onClick={() => client.auth.toLogin()}>{t('signup')}</Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>{t('login')}</Button>
+                <Button size="sm" onClick={() => navigate('/signup')}>{t('signup')}</Button>
               </>
             )}
           </div>
@@ -141,8 +141,8 @@ export default function HomePage() {
             <button onClick={() => scrollTo('safety')} className="text-start py-2">{t('safety')}</button>
             <a href="/blog/" className="py-2">{t('blog')}</a>
             {languagePicker}
-            <Button variant="ghost" onClick={() => client.auth.toLogin()}>{t('login')}</Button>
-            <Button onClick={() => client.auth.toLogin()}>{t('signup')}</Button>
+            <Button variant="ghost" onClick={() => navigate('/login')}>{t('login')}</Button>
+            <Button onClick={() => navigate('/signup')}>{t('signup')}</Button>
           </div>
         )}
       </header>
