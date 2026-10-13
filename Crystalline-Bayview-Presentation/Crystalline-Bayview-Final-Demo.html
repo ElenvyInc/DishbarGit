@@ -648,6 +648,23 @@ html.tab-paused *,html.tab-paused *::before,html.tab-paused *::after{animation-p
 .stat-num.stat-word{font-size:clamp(2rem,3.3vw,3rem);line-height:1;letter-spacing:-.045em;overflow-wrap:anywhere}
 @media(max-width:620px){.brand{padding:6px 13px;border-radius:21px}.brand-logo{width:195px;height:82px}.brand::after{inset:6px 13px}.nav{min-height:98px}.footer-brand .brand-logo{width:188px;height:80px}.floating-note{right:0;bottom:142px;width:210px}}
 </style>
+<style id="compact-feature-grid">
+/* Six compact feature icons replace the oversized stacked mobile cards. */
+.feature-strip{position:relative;z-index:3;padding:30px 0 22px}
+.feature-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.feature-tile{position:relative;min-width:0;min-height:148px;padding:15px 13px 14px;overflow:hidden;border:1px solid rgba(35,140,157,.34);border-radius:22px;background:linear-gradient(160deg,rgba(255,255,255,.94),rgba(209,241,238,.72));box-shadow:0 13px 30px rgba(2,75,115,.1),inset 0 1px 0 #fff;transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease}
+.feature-tile::before{content:"";position:absolute;inset:0;background:linear-gradient(125deg,rgba(255,255,255,.62),transparent 38%,rgba(58,195,214,.1));pointer-events:none}
+.feature-tile:hover{transform:translateY(-4px);border-color:rgba(12,175,189,.55);box-shadow:0 20px 38px rgba(2,75,115,.15),inset 0 1px 0 #fff}
+.feature-icon{position:relative;display:grid;place-items:center;width:38px;height:38px;margin-bottom:13px;border:1px solid rgba(141,242,244,.7);border-radius:13px;background:linear-gradient(145deg,#024B73,#238C9D);color:#8DF2F4;box-shadow:0 8px 17px rgba(2,75,115,.2),inset 0 1px 0 rgba(255,255,255,.32)}
+.feature-icon svg{width:18px;height:18px}
+.feature-status,.feature-tile strong,.feature-detail{position:relative;display:block}
+.feature-status{margin-bottom:7px;color:#238C9D;font:700 .54rem/1.2 "DM Sans",sans-serif;letter-spacing:.09em;text-transform:uppercase}
+.feature-tile strong{color:#024B73;font:700 .92rem/1.16 "DM Sans",sans-serif;letter-spacing:-.02em}
+.feature-detail{margin-top:6px;color:#2B6675;font:500 .68rem/1.4 "DM Sans",sans-serif}
+.feature-note{margin:13px 3px 0;color:#2B6675;font-size:.7rem;line-height:1.5}
+@media(max-width:1100px){.feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){.feature-strip{padding:24px 0 10px}.feature-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.feature-tile{min-height:136px;padding:13px 11px;border-radius:18px}.feature-icon{width:34px;height:34px;margin-bottom:10px;border-radius:11px}.feature-icon svg{width:16px;height:16px}.feature-status{font-size:.49rem}.feature-tile strong{font-size:.84rem}.feature-detail{font-size:.62rem}.feature-note{font-size:.64rem}}
+</style>
 </head>
 <body>
 <a class="skip-link" href="#top">Skip to main content</a>
@@ -674,22 +691,17 @@ html.tab-paused *,html.tab-paused *::before,html.tab-paused *::after{animation-p
           <div class="floating-note"><strong>Bayview Village</strong><span>Interior concept image supplied for this presentation. Final Bayview photography and location details remain to be confirmed.</span></div>
         </div>
       </div>
-    <section class="stats-section" aria-label="Verified features of the existing Vaughan clinic">
-      <div class="shell">
-        <div class="stats-grid">
-          <div class="stat-card reveal"><span class="stat-demo">Confirmed for Vaughan</span><span class="stat-num stat-word">Welcome</span><span class="stat-label">New patients are currently accepted.</span></div>
-          <div class="stat-card reveal"><span class="stat-demo">Confirmed for Vaughan</span><span class="stat-num stat-word">Saturday</span><span class="stat-label">Weekend appointments are listed.</span></div>
-          <div class="stat-card reveal"><span class="stat-demo">Confirmed for Vaughan</span><span class="stat-num stat-word">Free parking</span><span class="stat-label">Available at the existing Maple location.</span></div>
-        </div>
-        <p class="stats-note">Verified features of the existing Vaughan clinic. Bayview Village amenities and scheduling remain subject to confirmation.</p>
-      </div>
-    </section>
-      <div class="shell trust">
-        <div class="trust-inner">
-          <div class="trust-item trust-intro"><div><strong>Built around a better visit</strong><span>Clear, calm and considered from the first hello.</span></div></div>
-          <div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 2.7 8.3 7 10 4.3-1.7 7-5.3 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg><div><strong>Patient-first</strong><span>Time for questions and clear next steps.</span></div></div>
-          <div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 1.6 4.3L18 9l-4.4 1.7L12 15l-1.6-4.3L6 9l4.4-1.7L12 3Z"></path><path d="m18.5 15 .7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z"></path></svg><div><strong>Smart guidance</strong><span>A dynamic guide to help plan your visit.</span></div></div>
-          <div class="trust-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 18 18 5M6 5h5v5M13 14h5v5"></path></svg><div><strong>Conveniently local</strong><span>Coming to Bayview Village, North York.</span></div></div>
+      <div class="feature-strip" aria-label="Six features of the Crystalline Dental experience">
+        <div class="shell">
+          <div class="feature-grid">
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M4 19c0-3 2-5 5-5s5 2 5 5M18 8v6M15 11h6"></path></svg></span><span class="feature-status">Vaughan confirmed</span><strong>New patients</strong><span class="feature-detail">New patients are currently accepted.</span></div>
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h6"></path></svg></span><span class="feature-status">Vaughan confirmed</span><strong>Saturday visits</strong><span class="feature-detail">Weekend appointments are listed.</span></div>
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 20V4h6a5 5 0 0 1 0 10H7"></path><path d="M7 14h6"></path></svg></span><span class="feature-status">Vaughan confirmed</span><strong>Free parking</strong><span class="feature-detail">Available at the existing Maple location.</span></div>
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 2.7 8.3 7 10 4.3-1.7 7-5.3 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg></span><span class="feature-status">Experience direction</span><strong>Patient-first</strong><span class="feature-detail">Time for questions and clear next steps.</span></div>
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 1.6 4.3L18 9l-4.4 1.7L12 15l-1.6-4.3L6 9l4.4-1.7L12 3Z"></path><path d="m18.5 15 .7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z"></path></svg></span><span class="feature-status">Interactive demo</span><strong>Smart guidance</strong><span class="feature-detail">Helpful support to plan a visit.</span></div>
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"></path><circle cx="12" cy="9" r="2.2"></circle></svg></span><span class="feature-status">Location concept</span><strong>Bayview Village</strong><span class="feature-detail">A new North York location is planned.</span></div>
+          </div>
+          <p class="feature-note">Existing Vaughan details are clearly marked. Bayview amenities, hours, services and opening information remain subject to confirmation.</p>
         </div>
       </div>
     </section>
@@ -817,10 +829,10 @@ html.tab-paused *,html.tab-paused *::before,html.tab-paused *::after{animation-p
  const sticky=document.createElement('div');sticky.className='sticky-cta';sticky.hidden=true;sticky.innerHTML='<a class="btn btn-primary" href="#request">Request a visit <span aria-hidden="true">↗</span></a>';document.body.append(sticky);
  const hero=document.querySelector('.hero'),req=document.getElementById('request');
  const update=()=>{const height=doc.scrollHeight-innerHeight;bar.style.setProperty('--sp',height>0?scrollY/height:0);const r=req.getBoundingClientRect();const visible=hero.getBoundingClientRect().bottom<0&&!(r.top<innerHeight&&r.bottom>0);sticky.hidden=!visible;sticky.classList.toggle('show',visible)};addEventListener('scroll',update,{passive:true});addEventListener('resize',update);update();
- document.querySelectorAll('.stat-card,.service-card,.review-card,.principle,.location-card,.form-card,.smart-guide,.experience-card').forEach(el=>{el.classList.add('glass-fx');const sweep=document.createElement('span');sweep.className='sweep';sweep.setAttribute('aria-hidden','true');el.append(sweep);if(fine)el.addEventListener('pointermove',e=>{if(reduced())return;const r=el.getBoundingClientRect();el.style.setProperty('--px',e.clientX-r.left+'px');el.style.setProperty('--py',e.clientY-r.top+'px')})});
+ document.querySelectorAll('.feature-tile,.service-card,.review-card,.principle,.location-card,.form-card,.smart-guide,.experience-card').forEach(el=>{el.classList.add('glass-fx');const sweep=document.createElement('span');sweep.className='sweep';sweep.setAttribute('aria-hidden','true');el.append(sweep);if(fine)el.addEventListener('pointermove',e=>{if(reduced())return;const r=el.getBoundingClientRect();el.style.setProperty('--px',e.clientX-r.left+'px');el.style.setProperty('--py',e.clientY-r.top+'px')})});
  if(fine){const card=document.querySelector('.hero-card');let frame=0;hero.addEventListener('pointermove',e=>{if(reduced()||frame)return;frame=requestAnimationFrame(()=>{frame=0;const r=hero.getBoundingClientRect(),nx=(e.clientX-r.left)/r.width-.5,ny=(e.clientY-r.top)/r.height-.5;hero.style.setProperty('--mx',e.clientX-r.left+'px');hero.style.setProperty('--my',e.clientY-r.top+'px');card.style.setProperty('--ry',nx*5+'deg');card.style.setProperty('--rx',-ny*3+'deg')})});hero.addEventListener('pointerleave',()=>{card.style.setProperty('--ry','0deg');card.style.setProperty('--rx','0deg')})}
  const hv=document.querySelector('.hero-visual');if(hv){const c=document.createElement('div');c.className='crystals';c.setAttribute('aria-hidden','true');c.innerHTML='<span style="right:-16px;top:36%"><svg width="34" viewBox="0 0 100 120"><path d="M50 2 88 60 50 118 12 60Z" fill="#3AC3D6" fill-opacity=".5" stroke="white"/><path d="M50 2v116M12 60h76" stroke="white" stroke-opacity=".7"/></svg></span>';hv.append(c)}
- document.querySelectorAll('.services-grid,.stats-grid,.principles').forEach(g=>{g.classList.add('stagger');[...g.children].forEach((c,i)=>c.style.setProperty('--k',i))});
+ document.querySelectorAll('.services-grid,.feature-grid,.principles').forEach(g=>{g.classList.add('stagger');[...g.children].forEach((c,i)=>c.style.setProperty('--k',i))});
  // Cancel earlier typing whenever a new choice is made. No automated selection.
  const copy=document.getElementById('guide-result-copy');let typing=0,delay=0;
  document.querySelectorAll('.guide-option').forEach(b=>b.addEventListener('click',()=>{clearInterval(typing);clearTimeout(delay);const full=copy.textContent;copy.classList.remove('caret');const result=document.querySelector('.guide-result');result.classList.remove('thinking');if(reduced())return;result.classList.add('thinking');delay=setTimeout(()=>{result.classList.remove('thinking');if(reduced())return;copy.textContent='';copy.classList.add('caret');let n=0;typing=setInterval(()=>{n+=5;copy.textContent=full.slice(0,n);if(n>=full.length||reduced()){clearInterval(typing);copy.textContent=full;copy.classList.remove('caret')}},16)},220)}));
