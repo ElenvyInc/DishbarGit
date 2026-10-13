@@ -33,3 +33,6 @@
 *.dxf filter=lfs diff=lfs merge=lfs -text
 *.wmf filter=lfs diff=lfs merge=lfs -text
 *.emf filter=lfs diff=lfs merge=lfs -text
+
+# Keep the self-contained Crystalline Bayview delivery directly in this presentation branch.
+Crystalline-Bayview-Presentation/** -filter -diff -merge
