@@ -657,13 +657,16 @@ html.tab-paused *,html.tab-paused *::before,html.tab-paused *::after{animation-p
 .feature-tile:hover{transform:translateY(-4px);border-color:rgba(12,175,189,.55);box-shadow:0 20px 38px rgba(2,75,115,.15),inset 0 1px 0 #fff}
 .feature-icon{position:relative;display:grid;place-items:center;width:38px;height:38px;margin-bottom:13px;border:1px solid rgba(141,242,244,.7);border-radius:13px;background:linear-gradient(145deg,#024B73,#238C9D);color:#8DF2F4;box-shadow:0 8px 17px rgba(2,75,115,.2),inset 0 1px 0 rgba(255,255,255,.32)}
 .feature-icon svg{width:18px;height:18px}
-.feature-status,.feature-tile strong,.feature-detail{position:relative;display:block}
+.feature-status,.feature-tile strong,.feature-detail,.feature-value{position:relative;display:block}
 .feature-status{margin-bottom:7px;color:#238C9D;font:700 .54rem/1.2 "DM Sans",sans-serif;letter-spacing:.09em;text-transform:uppercase}
 .feature-tile strong{color:#024B73;font:700 .92rem/1.16 "DM Sans",sans-serif;letter-spacing:-.02em}
 .feature-detail{margin-top:6px;color:#2B6675;font:500 .68rem/1.4 "DM Sans",sans-serif}
+.feature-value{margin-bottom:6px;color:#024B73;font:600 clamp(1.3rem,2.1vw,1.8rem)/1.1 "DM Sans",sans-serif;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.feature-support{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 20px;margin-top:17px;color:#024B73;font:600 .72rem/1.4 "DM Sans",sans-serif}
+.feature-support span{display:inline-flex;align-items:center;gap:7px}.feature-support svg{width:14px;height:14px;color:#238C9D;flex:none}
 .feature-note{margin:13px 3px 0;color:#2B6675;font-size:.7rem;line-height:1.5}
 @media(max-width:1100px){.feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:620px){.feature-strip{padding:24px 0 10px}.feature-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.feature-tile{min-height:136px;padding:13px 11px;border-radius:18px}.feature-icon{width:34px;height:34px;margin-bottom:10px;border-radius:11px}.feature-icon svg{width:16px;height:16px}.feature-status{font-size:.49rem}.feature-tile strong{font-size:.84rem}.feature-detail{font-size:.62rem}.feature-note{font-size:.64rem}}
+@media(max-width:620px){.feature-strip{padding:24px 0 10px}.feature-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.feature-tile{min-height:136px;padding:13px 11px;border-radius:18px}.feature-icon{width:34px;height:34px;margin-bottom:10px;border-radius:11px}.feature-icon svg{width:16px;height:16px}.feature-status{font-size:.49rem}.feature-tile strong{font-size:.84rem}.feature-value{font-size:1.45rem}.feature-detail{font-size:.62rem}.feature-support{gap:8px 14px;font-size:.65rem}.feature-note{font-size:.64rem}}
 </style>
 </head>
 <body>
@@ -694,14 +697,19 @@ html.tab-paused *,html.tab-paused *::before,html.tab-paused *::after{animation-p
       <div class="feature-strip" aria-label="Six features of the Crystalline Dental experience">
         <div class="shell">
           <div class="feature-grid">
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"></path></svg></span><span class="feature-status">Reference figure</span><span class="feature-value">7,000+</span><strong>5-star Google reviews</strong></div>
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 4v2"></path></svg></span><span class="feature-status">Reference figure</span><span class="feature-value">150,000+</span><strong>Patients seen</strong></div>
+            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10l1 6H6l1-6ZM9 9l1 12h4l1-12M8 12h8M8.5 15h7M9 18h6"></path></svg></span><span class="feature-status">Reference figure</span><span class="feature-value">30,000+</span><strong>Implants completed</strong></div>
             <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M4 19c0-3 2-5 5-5s5 2 5 5M18 8v6M15 11h6"></path></svg></span><span class="feature-status">Vaughan confirmed</span><strong>New patients</strong><span class="feature-detail">New patients are currently accepted.</span></div>
             <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h6"></path></svg></span><span class="feature-status">Vaughan confirmed</span><strong>Saturday visits</strong><span class="feature-detail">Weekend appointments are listed.</span></div>
             <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 20V4h6a5 5 0 0 1 0 10H7"></path><path d="M7 14h6"></path></svg></span><span class="feature-status">Vaughan confirmed</span><strong>Free parking</strong><span class="feature-detail">Available at the existing Maple location.</span></div>
-            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 2.7 8.3 7 10 4.3-1.7 7-5.3 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg></span><span class="feature-status">Experience direction</span><strong>Patient-first</strong><span class="feature-detail">Time for questions and clear next steps.</span></div>
-            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 1.6 4.3L18 9l-4.4 1.7L12 15l-1.6-4.3L6 9l4.4-1.7L12 3Z"></path><path d="m18.5 15 .7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z"></path></svg></span><span class="feature-status">Interactive demo</span><strong>Smart guidance</strong><span class="feature-detail">Helpful support to plan a visit.</span></div>
-            <div class="feature-tile reveal"><span class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"></path><circle cx="12" cy="9" r="2.2"></circle></svg></span><span class="feature-status">Location concept</span><strong>Bayview Village</strong><span class="feature-detail">A new North York location is planned.</span></div>
           </div>
-          <p class="feature-note">Existing Vaughan details are clearly marked. Bayview amenities, hours, services and opening information remain subject to confirmation.</p>
+          <div class="feature-support" aria-label="Experience highlights">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 2.7 8.3 7 10 4.3-1.7 7-5.3 7-10V6l-7-3Z"></path><path d="m9 12 2 2 4-4"></path></svg>Patient-first</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"></path></svg>Smart guidance</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"></path><circle cx="12" cy="9" r="2.2"></circle></svg>Bayview Village</span>
+          </div>
+          <p class="feature-note">Statistics reproduced from the supplied reference for this presentation; clinic totals require approval before publishing. Vaughan amenities are marked above; Bayview details remain to be confirmed.</p>
         </div>
       </div>
     </section>

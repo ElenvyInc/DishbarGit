@@ -30,5 +30,6 @@ This package includes:
 - Opening date and clinic hours.
 - Services available at the Bayview location.
 - Final policy-page links and approved Bayview photography.
+- Statistics supplied in the reference screenshot: 7,000+ 5-star Google reviews, 150,000+ patients seen, and 30,000+ implants completed. These appear in the compact six-feature grid for review; the clinic must approve their accuracy and scope before public release.
 
 The supplied modern clinic-interior image is presented as a concept image; it is not described as confirmed Bayview photography.
