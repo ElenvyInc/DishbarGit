@@ -14,13 +14,13 @@ from sqlalchemy import select, func, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from dependencies.auth import get_current_user
+from dependencies.auth import get_current_user, get_admin_user
 from schemas.auth import UserResponse
 from models.platform_settings import Platform_settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/admin/settings", tags=["admin-settings"])
+router = APIRouter(prefix="/api/v1/admin/settings", tags=["admin-settings"], dependencies=[Depends(get_admin_user)])
 
 # Default pilot settings
 DEFAULT_SETTINGS = {
