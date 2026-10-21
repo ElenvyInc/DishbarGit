@@ -9,12 +9,13 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
+from dependencies.auth import get_admin_user
 from services.platform_settings import Platform_settingsService
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/entities/platform_settings", tags=["platform_settings"])
+router = APIRouter(prefix="/api/v1/entities/platform_settings", tags=["platform_settings"], dependencies=[Depends(get_admin_user)])
 
 
 # ---------- Pydantic Schemas ----------
