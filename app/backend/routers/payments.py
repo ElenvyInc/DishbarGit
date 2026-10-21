@@ -1,50 +1,67 @@
+"""Checkout, quotes, signed Stripe webhooks, and payment verification.
+
+A redirect back from Stripe is not payment. An order becomes paid only when the
+Stripe session is payment_status=paid and the amount, currency, owner, and
+session id match the server order.
 """
-Payment Router - Production-ready with inventory checks, pilot mode validation,
-and proper order workflow.
-"""
+
+from __future__ import annotations
+
 import json
 import logging
-from datetime import datetime, date, time as dtime
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
-from sqlalchemy import select, func, and_, update
-from sqlalchemy.ext.asyncio import AsyncSession
+import os
+from datetime import datetime, timezone
 from typing import List, Optional
+
 import stripe
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from core.config import settings
+from core.redirects import resolve_checkout_origin
 from dependencies.auth import get_current_user
-from schemas.auth import UserResponse
+from models.commerce import StripeWebhookEvent
 from models.orders import Orders
-from models.menu_items import Menu_items
-from models.chefs import Chefs
-from models.platform_settings import Platform_settings
+from schemas.auth import UserResponse
+from services.cart_validation import cook_delivery_available, enforce_pilot_restrictions, resolve_cart
+from services.inventory import (
+    MAX_ITEM_QUANTITY,
+    consume_order_reservations,
+    release_expired_reservations,
+    release_order_reservations,
+    reservation_expiry,
+    reserve_menu_item,
+    InventoryError,
+)
+from services.pricing import OrderMoney, cents_to_decimal, live_checkout_block_reason, stripe_line_items
 
 router = APIRouter(prefix="/api/v1/payment", tags=["payment"])
 logger = logging.getLogger(__name__)
 
-# Initialize Stripe API key - may be empty in pilot/dev environments
 try:
-    _stripe_key = settings.stripe_secret_key
+    _stripe_key = os.getenv("STRIPE_SECRET_KEY", "")
     if _stripe_key:
         stripe.api_key = _stripe_key
     else:
         logger.warning("STRIPE_SECRET_KEY is empty. Payment processing will be unavailable.")
-except AttributeError:
+except Exception:
     logger.warning("STRIPE_SECRET_KEY is not configured. Payment processing will be unavailable.")
 
 
-class CartItem(BaseModel):
+class CheckoutLine(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: int
-    title: str
-    price: float
-    quantity: int
-    chef_id: int
+    quantity: int = Field(..., ge=1, le=MAX_ITEM_QUANTITY)
 
 
 class CheckoutRequest(BaseModel):
-    items: List[CartItem]
+    model_config = ConfigDict(extra="ignore")
+
+    items: List[CheckoutLine]
     delivery_type: str = "pickup"
     delivery_address: str = ""
     delivery_postal_code: str = ""
@@ -58,6 +75,9 @@ class CheckoutRequest(BaseModel):
 class CheckoutResponse(BaseModel):
     session_id: str
     url: str
+    order_id: int
+    customer_total_cents: int
+    currency: str
 
 
 class VerifyRequest(BaseModel):
@@ -70,183 +90,113 @@ class VerifyResponse(BaseModel):
     payment_status: str
 
 
-class OrderValidationError(BaseModel):
-    error: str
-    details: Optional[str] = None
+def _public_money(money: OrderMoney, lines, chef_id: int, settings: dict) -> dict:
+    payload = money.public_dict()
+    block_reason = live_checkout_block_reason(settings)
+    payload["chef_id"] = chef_id
+    payload["acceptance_policy"] = "not_configured"
+    payload["checkout_allowed"] = block_reason is None
+    payload["checkout_block_reason"] = block_reason or ""
+    payload["cook_delivery_available"] = cook_delivery_available(settings)
+    payload["third_party_delivery_available"] = False
+    payload["items"] = [
+        {
+            "id": line.item.id,
+            "title": line.item.title,
+            "quantity": line.quantity,
+            "unit_price": f"{cents_to_decimal(line.unit_cents):.2f}",
+            "line_total": f"{cents_to_decimal(line.line_cents):.2f}",
+        }
+        for line in lines
+    ]
+    return payload
 
 
-async def _get_setting(db: AsyncSession, key: str, default: str = "") -> str:
-    """Get a platform setting value"""
-    result = await db.execute(
-        select(Platform_settings).where(Platform_settings.key == key)
-    )
-    setting = result.scalar_one_or_none()
-    return setting.value if setting else default
+def _session_dict(session) -> dict:
+    if isinstance(session, dict):
+        metadata = session.get("metadata") or {}
+        return {
+            "id": session.get("id"),
+            "payment_status": session.get("payment_status"),
+            "status": session.get("status"),
+            "amount_total": session.get("amount_total"),
+            "currency": session.get("currency"),
+            "metadata": dict(metadata),
+            "payment_intent": session.get("payment_intent"),
+        }
+    metadata = session.metadata or {}
+    if not isinstance(metadata, dict):
+        metadata = dict(metadata)
+    return {
+        "id": session.id,
+        "payment_status": session.payment_status,
+        "status": getattr(session, "status", None),
+        "amount_total": session.amount_total,
+        "currency": session.currency,
+        "metadata": metadata,
+        "payment_intent": getattr(session, "payment_intent", None),
+    }
 
 
-async def _validate_pilot_mode(db: AsyncSession, postal_code: str, delivery_type: str):
-    """Validate order against pilot mode restrictions"""
-    pilot_mode = await _get_setting(db, "pilot_mode", "true")
-    if pilot_mode.lower() != "true":
-        return  # Not in pilot mode, skip checks
+def _payment_matches(session: dict, order: Orders) -> tuple[bool, str]:
+    metadata = session.get("metadata") or {}
+    if str(metadata.get("order_id", "")) != str(order.id):
+        return False, "order_mismatch"
+    if str(metadata.get("user_id", "")) != str(order.user_id):
+        return False, "owner_mismatch"
+    if (session.get("currency") or "").lower() != "cad":
+        return False, "currency_mismatch"
+    if order.customer_total_cents is None or int(session.get("amount_total") or -1) != int(order.customer_total_cents):
+        return False, "amount_mismatch"
+    if order.stripe_session_id and session.get("id") and session.get("id") != order.stripe_session_id:
+        return False, "session_mismatch"
+    return True, "ok"
 
-    # Check platform is open
-    platform_open = await _get_setting(db, "platform_open", "true")
-    if platform_open.lower() != "true":
-        raise HTTPException(
-            status_code=400,
-            detail="Ordering is currently paused. Please try again later."
-        )
 
-    # Check ordering hours
-    hours_start = await _get_setting(db, "ordering_hours_start", "09:00")
-    hours_end = await _get_setting(db, "ordering_hours_end", "20:00")
-    now = datetime.now()
+async def _apply_paid(db: AsyncSession, order: Orders, session: dict) -> str:
+    if order.payment_status == "paid":
+        return "already_paid"
+    if session.get("payment_status") != "paid":
+        return "not_paid"
+    matches, reason = _payment_matches(session, order)
+    if not matches:
+        order.payment_status = "review_required"
+        logger.warning("Payment for order %s was not applied: %s", order.id, reason)
+        return reason
+    order.payment_status = "paid"
+    order.status = "awaiting_acceptance"
+    order.stripe_amount_total = int(session["amount_total"])
+    if session.get("id") and not order.stripe_session_id:
+        order.stripe_session_id = session["id"]
+    if session.get("payment_intent"):
+        order.stripe_payment_intent_id = str(session["payment_intent"])
+    await consume_order_reservations(db, order.id)
+    return "paid"
+
+
+async def _apply_failed_or_expired(db: AsyncSession, order: Orders, outcome: str) -> str:
+    if order.payment_status == "paid":
+        return "ignored_after_paid"
+    order.payment_status = outcome
+    order.status = "cancelled"
+    await release_order_reservations(db, order.id)
+    return outcome
+
+
+@router.post("/quote")
+async def quote_cart(
+    data: CheckoutRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the server price breakdown. Does not reserve stock or create an order."""
     try:
-        start_h, start_m = map(int, hours_start.split(":"))
-        end_h, end_m = map(int, hours_end.split(":"))
-        start_time = dtime(start_h, start_m)
-        end_time = dtime(end_h, end_m)
-        current_time = now.time()
-        if current_time < start_time or current_time > end_time:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Ordering is only available between {hours_start} and {hours_end}."
-            )
-    except (ValueError, TypeError):
-        pass  # If time parsing fails, allow the order
-
-    # Check ordering days
-    ordering_days_str = await _get_setting(db, "ordering_days", "[]")
-    try:
-        ordering_days = json.loads(ordering_days_str)
-        if ordering_days:
-            today_name = now.strftime("%A").lower()
-            if today_name not in [d.lower() for d in ordering_days]:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Ordering is not available on {now.strftime('%A')}."
-                )
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    # Check daily order limit
-    daily_limit_str = await _get_setting(db, "daily_order_limit", "20")
-    try:
-        daily_limit = int(daily_limit_str)
-        if daily_limit > 0:
-            today = date.today()
-            count_result = await db.execute(
-                select(func.count(Orders.id)).where(
-                    and_(
-                        func.date(Orders.created_at) == today,
-                        Orders.payment_status == "paid",
-                    )
-                )
-            )
-            today_orders = count_result.scalar() or 0
-            if today_orders >= daily_limit:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Daily order limit reached. Please try again tomorrow."
-                )
-    except (ValueError, TypeError):
-        pass
-
-    # Check postal code restriction for delivery orders
-    if delivery_type != "pickup" and postal_code:
-        postal_codes_str = await _get_setting(db, "pilot_postal_codes", "[]")
-        try:
-            allowed_codes = json.loads(postal_codes_str)
-            if allowed_codes:
-                postal_prefix = postal_code.upper().replace(" ", "")[:3]
-                if not any(postal_prefix.startswith(code.upper()) for code in allowed_codes):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Delivery is not available in your area ({postal_prefix}). Currently serving: {', '.join(allowed_codes)}"
-                    )
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-
-async def _validate_inventory(db: AsyncSession, items: List[CartItem]):
-    """Check inventory availability for all items. Uses SELECT FOR UPDATE to prevent race conditions."""
-    for item in items:
-        result = await db.execute(
-            select(Menu_items).where(Menu_items.id == item.id)
-        )
-        menu_item = result.scalar_one_or_none()
-
-        if not menu_item:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Menu item '{item.title}' is no longer available."
-            )
-
-        if not menu_item.is_available:
-            raise HTTPException(
-                status_code=400,
-                detail=f"'{item.title}' is currently unavailable."
-            )
-
-        if menu_item.max_orders is not None and menu_item.max_orders > 0:
-            # Count existing paid/confirmed orders for this item today
-            today = date.today()
-            # Parse orders that contain this item
-            orders_result = await db.execute(
-                select(Orders).where(
-                    and_(
-                        Orders.chef_id == item.chef_id,
-                        Orders.payment_status.in_(["paid", "pending"]),
-                        func.date(Orders.created_at) == today,
-                    )
-                )
-            )
-            existing_orders = orders_result.scalars().all()
-
-            total_ordered = 0
-            for order in existing_orders:
-                try:
-                    order_items = json.loads(order.items_json) if order.items_json else []
-                    for oi in order_items:
-                        if oi.get("id") == item.id:
-                            total_ordered += oi.get("quantity", 0)
-                except (json.JSONDecodeError, TypeError):
-                    pass
-
-            remaining = menu_item.max_orders - total_ordered
-            if item.quantity > remaining:
-                if remaining <= 0:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"'{item.title}' is sold out for today."
-                    )
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Only {remaining} of '{item.title}' remaining. You requested {item.quantity}."
-                )
-
-        # Verify price matches (prevent price manipulation)
-        if abs(menu_item.price - item.price) > 0.01:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Price for '{item.title}' has changed. Please refresh and try again."
-            )
-
-
-async def _validate_chef(db: AsyncSession, chef_id: int):
-    """Verify chef is approved and active"""
-    result = await db.execute(
-        select(Chefs).where(Chefs.id == chef_id)
-    )
-    chef = result.scalar_one_or_none()
-    if not chef:
-        raise HTTPException(status_code=400, detail="Chef not found.")
-    if not chef.is_approved:
-        raise HTTPException(status_code=400, detail="This chef is not currently accepting orders.")
-    if not chef.is_active:
-        raise HTTPException(status_code=400, detail="This chef is temporarily unavailable.")
-    return chef
+        _chef, lines, money, settings = await resolve_cart(db, data.items, data.delivery_type)
+        return _public_money(money, lines, _chef.id, settings)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Quote failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/create_payment_session", response_model=CheckoutResponse)
@@ -256,16 +206,8 @@ async def create_payment_session(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a Stripe checkout session with full validation"""
+    """Create an unpaid order from server prices and a Stripe Checkout session."""
     try:
-        frontend_host = request.headers.get("App-Host")
-        if frontend_host and not frontend_host.startswith(("http://", "https://")):
-            frontend_host = f"https://{frontend_host}"
-
-        if not data.items:
-            raise HTTPException(status_code=400, detail="Cart is empty")
-
-        # Validate required customer info
         if not data.customer_name.strip():
             raise HTTPException(status_code=400, detail="Full name is required")
         if not data.customer_phone.strip():
@@ -275,166 +217,121 @@ async def create_payment_session(
         if not data.allergen_acknowledged:
             raise HTTPException(status_code=400, detail="You must acknowledge the allergen notice before ordering")
 
-        # Validate pilot mode restrictions
-        await _validate_pilot_mode(db, data.delivery_postal_code, data.delivery_type)
+        origin = resolve_checkout_origin(request.headers.get("App-Host"))
+        await release_expired_reservations(db)
+        await db.commit()
+        chef, lines, money, settings = await resolve_cart(db, data.items, data.delivery_type)
+        block_reason = live_checkout_block_reason(settings)
+        if block_reason:
+            raise HTTPException(status_code=503, detail=block_reason)
+        await enforce_pilot_restrictions(db, settings, data.delivery_postal_code, data.delivery_type)
 
-        # Validate chef is active
-        chef = await _validate_chef(db, data.items[0].chef_id)
+        server_items = [
+            {
+                "id": line.item.id,
+                "title": line.item.title,
+                "unit_price_cents": line.unit_cents,
+                "quantity": line.quantity,
+                "chef_id": line.item.chef_id,
+            }
+            for line in lines
+        ]
+        snapshot = money.as_snapshot(settings.get("tax_rules"))
+        snapshot["calculated_at"] = datetime.now(timezone.utc).isoformat()
 
-        # Validate inventory
-        await _validate_inventory(db, data.items)
-
-        # Get platform settings for fee calculation
-        commission_rate_str = await _get_setting(db, "platform_commission_rate", "0.15")
-        tax_rate_str = await _get_setting(db, "tax_rate", "0.13")
-        min_order_str = await _get_setting(db, "minimum_order_amount", "15.00")
-        base_fee_str = await _get_setting(db, "base_delivery_fee", "3.99")
-        max_fee_str = await _get_setting(db, "max_delivery_fee", "15.00")
-
-        commission_rate = float(commission_rate_str)
-        tax_rate = float(tax_rate_str)
-        min_order = float(min_order_str)
-        base_delivery_fee = float(base_fee_str)
-        max_delivery_fee = float(max_fee_str)
-
-        # Calculate amounts server-side (NEVER trust frontend amounts)
-        subtotal = sum(item.price * item.quantity for item in data.items)
-
-        # Minimum order check
-        if subtotal < min_order:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Minimum order amount is ${min_order:.2f}. Your subtotal is ${subtotal:.2f}."
-            )
-
-        # Calculate delivery fee server-side
-        delivery_fee = 0.0
-        if data.delivery_type != "pickup":
-            # Use base delivery fee from settings (distance calculation requires geocoding)
-            delivery_fee = min(base_delivery_fee, max_delivery_fee)
-
-        # Calculate tax and commission
-        tax = subtotal * tax_rate
-        commission = subtotal * commission_rate
-        total = subtotal + delivery_fee + tax
-        chef_amount = subtotal - commission
-
-        # Create order in database
         order = Orders(
-            user_id=current_user.id,
-            chef_id=data.items[0].chef_id,
-            items_json=json.dumps([item.model_dump() for item in data.items]),
-            total_amount=total,
-            commission_amount=commission,
-            chef_amount=chef_amount,
-            status="pending",
+            user_id=str(current_user.id),
+            chef_id=chef.id,
+            items_json=json.dumps(server_items),
+            total_amount=float(cents_to_decimal(money.customer_total_cents)),
+            commission_amount=float(cents_to_decimal(money.commission_cents)),
+            chef_amount=float(cents_to_decimal(money.cook_share_cents)),
+            status="pending_payment",
             delivery_type=data.delivery_type,
-            delivery_address=data.delivery_address,
-            customer_name=data.customer_name,
-            customer_phone=data.customer_phone,
+            delivery_address=data.delivery_address.strip(),
+            customer_name=data.customer_name.strip(),
+            customer_phone=data.customer_phone.strip(),
             payment_status="unpaid",
+            food_subtotal_cents=money.food_subtotal_cents,
+            service_fee_cents=money.service_fee_cents,
+            commission_cents=money.commission_cents,
+            delivery_fee_cents=money.delivery_fee_cents,
+            tax_cents=money.tax_cents,
+            customer_total_cents=money.customer_total_cents,
+            cook_share_cents=money.cook_share_cents,
+            platform_gross_cents=money.platform_gross_cents,
+            currency="CAD",
+            fee_snapshot_json=json.dumps(snapshot),
         )
         db.add(order)
-        await db.flush()  # Flush to get the order.id without closing the transaction
-
-        # Store order_id in a local variable BEFORE any session state changes
+        await db.flush()
         order_id = order.id
-
+        line_items = stripe_line_items(
+            [
+                {"name": item["title"], "unit_amount_cents": item["unit_price_cents"], "quantity": item["quantity"]}
+                for item in server_items
+            ],
+            money,
+        )
+        expires_at = reservation_expiry()
+        for line in lines:
+            await reserve_menu_item(db, line.item, line.quantity, order_id, expires_at)
         await db.commit()
 
-        # Check Stripe configuration before making the API call
         if not stripe.api_key:
-            # Order was created but payment can't proceed - update order status
-            result = await db.execute(select(Orders).where(Orders.id == order_id))
-            order_unpaid = result.scalar_one_or_none()
-            if order_unpaid:
-                order_unpaid.payment_status = "payment_unavailable"
-                await db.commit()
+            await release_order_reservations(db, order_id)
+            stored = await db.get(Orders, order_id)
+            if stored is not None:
+                stored.payment_status = "payment_unavailable"
+            await db.commit()
             raise HTTPException(
                 status_code=503,
-                detail="Online payment is temporarily unavailable. Your order has been saved. Please try again later or contact support."
+                detail="Online payment is temporarily unavailable. Please try again later or contact support.",
             )
 
-        # Create Stripe line items
-        line_items = []
-        for item in data.items:
-            line_items.append({
-                "price_data": {
-                    "currency": "cad",
-                    "product_data": {"name": item.title},
-                    "unit_amount": int(item.price * 100),
-                },
-                "quantity": item.quantity,
-            })
+        # Ignore a client Idempotency-Key. The key is bound to this order id only.
+        idempotency_key = f"dishbar-order-{order_id}"
 
-        # Add tax as line item
-        if tax > 0:
-            line_items.append({
-                "price_data": {
-                    "currency": "cad",
-                    "product_data": {"name": "HST (13%)"},
-                    "unit_amount": int(tax * 100),
-                },
-                "quantity": 1,
-            })
-
-        # Add delivery fee if applicable
-        if delivery_fee > 0:
-            line_items.append({
-                "price_data": {
-                    "currency": "cad",
-                    "product_data": {"name": "Delivery Fee"},
-                    "unit_amount": int(delivery_fee * 100),
-                },
-                "quantity": 1,
-            })
-
-        # Create Stripe session
         stripe_params = {
             "payment_method_types": ["card"],
             "line_items": line_items,
             "mode": "payment",
-            "success_url": f"{frontend_host}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
-            "cancel_url": f"{frontend_host}/checkout",
+            "success_url": f"{origin}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+            "cancel_url": f"{origin}/checkout",
             "metadata": {
                 "order_id": str(order_id),
-                "user_id": current_user.id,
+                "user_id": str(current_user.id),
+                "customer_total_cents": str(money.customer_total_cents),
+                "currency": "cad",
             },
         }
-
-        # Only add customer_email if valid
         if data.customer_email and data.customer_email.strip():
             stripe_params["customer_email"] = data.customer_email.strip()
 
-        # Use a stable idempotency key so retries cannot create duplicate Stripe sessions.
-        idempotency_key = request.headers.get("Idempotency-Key") or f"dishbar-order-{order_id}"
-        if len(idempotency_key) > 255:
-            raise HTTPException(status_code=400, detail="Idempotency-Key is too long")
-        session = stripe.checkout.Session.create(
-            idempotency_key=idempotency_key,
-            **stripe_params,
-        )
-
-        # Save session ID to order
-        result = await db.execute(select(Orders).where(Orders.id == order_id))
-        order_fresh = result.scalar_one_or_none()
-        if order_fresh:
-            order_fresh.stripe_session_id = session.id
+        session = stripe.checkout.Session.create(idempotency_key=idempotency_key, **stripe_params)
+        stored = await db.get(Orders, order_id)
+        if stored is not None:
+            stored.stripe_session_id = session.id
             await db.commit()
 
-        return CheckoutResponse(session_id=session.id, url=session.url)
-
-    except stripe.error.StripeError as e:
-        logger.error(f"Stripe error: {e}")
-        raise HTTPException(
-            status_code=502,
-            detail="Payment service is temporarily unavailable. Please try again in a moment."
+        return CheckoutResponse(
+            session_id=session.id,
+            url=session.url,
+            order_id=order_id,
+            customer_total_cents=money.customer_total_cents,
+            currency="CAD",
         )
+    except InventoryError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=exc.message)
+    except stripe.error.StripeError:
+        logger.exception("Stripe checkout session failed")
+        raise HTTPException(status_code=502, detail="Payment service is temporarily unavailable. Please try again.")
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Payment session error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to create payment session: {str(e)}")
+    except Exception:
+        logger.exception("Payment session failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/webhook")
@@ -442,8 +339,8 @@ async def stripe_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Process signed Stripe checkout events idempotently."""
-    webhook_secret = getattr(settings, "stripe_webhook_secret", "")
+    """Process a signed Stripe event once. Later or duplicate events cannot un-pay an order."""
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
     if not webhook_secret:
         raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
 
@@ -459,40 +356,58 @@ async def stripe_webhook(
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature")
 
-    event_type = event["type"]
+    event_data = event.to_dict() if hasattr(event, "to_dict") else event
+    event_id = event_data.get("id")
+    event_type = event_data.get("type")
+    if not event_id:
+        raise HTTPException(status_code=400, detail="Stripe event id is required")
+
+    existing = await db.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.event_id == event_id))
+    if existing.scalar_one_or_none() is not None:
+        return {"received": True, "duplicate": True}
+
+    record = StripeWebhookEvent(event_id=event_id, event_type=event_type or "unknown", outcome="received")
+    db.add(record)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        return {"received": True, "duplicate": True}
+
     if event_type not in {
         "checkout.session.completed",
         "checkout.session.async_payment_succeeded",
         "checkout.session.async_payment_failed",
         "checkout.session.expired",
     }:
+        record.outcome = "ignored"
+        await db.commit()
         return {"received": True, "handled": False}
 
-    session = event["data"]["object"]
-    metadata = session.get("metadata") or {}
-    order_id = metadata.get("order_id")
+    session = _session_dict(event_data["data"]["object"])
+    order_id = (session.get("metadata") or {}).get("order_id")
     if not order_id:
+        record.outcome = "no_order"
+        await db.commit()
         return {"received": True, "handled": False}
 
     result = await db.execute(select(Orders).where(Orders.id == int(order_id)))
     order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+    if order is None:
+        record.outcome = "order_missing"
+        await db.commit()
+        return {"received": True, "handled": False}
 
+    record.order_id = order.id
     if event_type in {"checkout.session.completed", "checkout.session.async_payment_succeeded"}:
-        order.payment_status = "paid"
-        order.status = "confirmed"
+        record.outcome = await _apply_paid(db, order, session)
     elif event_type == "checkout.session.async_payment_failed":
-        order.payment_status = "payment_failed"
-    elif event_type == "checkout.session.expired" and order.payment_status != "paid":
-        order.payment_status = "expired"
-        order.status = "cancelled"
+        record.outcome = await _apply_failed_or_expired(db, order, "payment_failed")
+    else:
+        record.outcome = await _apply_failed_or_expired(db, order, "expired")
 
-    if not order.stripe_session_id:
-        order.stripe_session_id = session.get("id")
     await db.commit()
-
-    return {"received": True, "handled": True, "order_id": order.id, "payment_status": order.payment_status}
+    return {"received": True, "handled": True, "duplicate": False, "outcome": record.outcome}
 
 
 @router.post("/verify_payment", response_model=VerifyResponse)
@@ -501,48 +416,37 @@ async def verify_payment(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Verify payment status and update order"""
+    """Confirm payment with Stripe. Session status 'complete' alone is not paid."""
     try:
-        session = stripe.checkout.Session.retrieve(data.session_id)
-        order_id = session.metadata.get("order_id")
+        session = _session_dict(stripe.checkout.Session.retrieve(data.session_id))
+        order_id = (session.get("metadata") or {}).get("order_id")
+        if not order_id:
+            return VerifyResponse(status="pending", order_id=None, payment_status=session.get("payment_status") or "unpaid")
 
-        if order_id:
-            result = await db.execute(
-                select(Orders).where(Orders.id == int(order_id))
-            )
-            order = result.scalar_one_or_none()
+        result = await db.execute(select(Orders).where(Orders.id == int(order_id)))
+        order = result.scalar_one_or_none()
+        if order is None:
+            raise HTTPException(status_code=404, detail="Order not found")
+        if str(order.user_id) != str(current_user.id) and current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="You do not have access to this payment session")
 
-            if order and str(order.user_id) != str(current_user.id) and current_user.role != "admin":
-                raise HTTPException(status_code=403, detail="You do not have access to this payment session")
+        if session.get("payment_status") == "paid":
+            await _apply_paid(db, order, session)
+        elif session.get("status") == "expired" and order.payment_status != "paid":
+            await _apply_failed_or_expired(db, order, "expired")
+        await db.commit()
 
-            if order:
-                status_mapping = {"complete": "paid", "open": "pending", "expired": "cancelled"}
-                payment_status = status_mapping.get(session.status, "pending")
-
-                # Only update if status actually changed (prevent duplicate processing)
-                if order.payment_status != payment_status:
-                    order.payment_status = payment_status
-                    if payment_status == "paid":
-                        order.status = "confirmed"
-                    elif payment_status == "cancelled":
-                        order.status = "cancelled"
-                    await db.commit()
-
-                return VerifyResponse(
-                    status=payment_status,
-                    order_id=int(order_id),
-                    payment_status=session.payment_status or "unpaid",
-                )
-
+        status = "paid" if order.payment_status == "paid" else "pending"
         return VerifyResponse(
-            status="pending",
-            order_id=int(order_id) if order_id else None,
-            payment_status=session.payment_status or "unpaid",
+            status=status,
+            order_id=order.id,
+            payment_status=order.payment_status or "unpaid",
         )
-
-    except stripe.error.StripeError as e:
-        logger.error(f"Stripe verification error: {e}")
-        raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")
-    except Exception as e:
-        logger.error(f"Payment verification error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to verify payment: {str(e)}")
+    except stripe.error.StripeError:
+        logger.exception("Stripe verification failed")
+        raise HTTPException(status_code=502, detail="Payment verification is temporarily unavailable")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Payment verification failed")
+        raise HTTPException(status_code=500, detail="Internal server error")

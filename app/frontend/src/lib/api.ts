@@ -117,6 +117,38 @@ const en = {
   heroAlt: 'A home chef presenting a prepared homemade meal to a customer',
   chefAlt: 'Home chef preparing to join the DishBar Ontario marketplace',
   applicationAlt: 'Ontario home chef applicant preparing homemade food',
+  subtotal: 'Subtotal',
+  serviceFee: 'Service fee',
+  tax: 'Tax',
+  taxNotApplied: 'Tax is not added automatically. Any tax is shown only when a configured rule applies.',
+  taxUnconfirmed: 'Tax unconfirmed',
+  checkoutPausedTax: 'Live checkout is paused until tax is reviewed. This total is not a confirmed charge.',
+  cookDeliveryUnavailable: 'Cook delivery is not available until it is approved and a fee is configured.',
+  thirdPartyUnavailable: 'Third-party delivery is not available yet.',
+  deliveryFee: 'Delivery fee',
+  deliveryFeePending: 'Delivery pricing is not configured yet, so no delivery fee is charged.',
+  placeOrder: 'Place order',
+  singleCookConflict: 'Your cart already has meals from another cook. Choose OK to replace the cart, or Cancel to keep it.',
+  keptCurrentCart: 'Kept your current cart',
+  paymentPendingVerification: 'Payment is not confirmed until the server verifies it with Stripe.',
+  awaitingCookAcceptance: 'Payment received. The cook still needs to accept the order.',
+  mixedCartBlocked: 'This cart has meals from more than one cook. Keep one cook before checkout.',
+  serverQuotePending: 'Waiting for the server total.',
+  backToHome: 'Back to Home',
+  selfDelivery: 'Cook delivery',
+  thirdParty: 'Third-party delivery',
+  rating: 'Rating',
+  menu: 'Menu',
+  writeReview: 'Write a review',
+  submitReview: 'Submit review',
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  preparing: 'Preparing',
+  ready: 'Ready',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+  paymentSuccess: 'Payment confirmed',
+  paymentSuccessMsg: 'Stripe verified this payment. The cook still needs to accept the order.',
 };
 
 const fr: typeof en = {
@@ -232,6 +264,38 @@ const fr: typeof en = {
   heroAlt: 'Un chef à domicile présente un repas maison préparé à une cliente',
   chefAlt: 'Un chef à domicile se prépare à rejoindre DishBar en Ontario',
   applicationAlt: 'Une candidate chef ontarienne prépare un repas maison',
+  subtotal: 'Sous-total',
+  serviceFee: 'Frais de service',
+  tax: 'Taxe',
+  taxNotApplied: 'Aucune taxe n’est ajoutée automatiquement. Une taxe n’apparaît que si une règle configurée s’applique.',
+  taxUnconfirmed: 'Taxe non confirmée',
+  checkoutPausedTax: 'Le paiement en ligne est en pause jusqu’à la révision de la taxe. Ce total n’est pas un montant confirmé.',
+  cookDeliveryUnavailable: 'La livraison par le cuisinier n’est pas disponible tant qu’elle n’est pas approuvée et qu’un tarif n’est pas configuré.',
+  thirdPartyUnavailable: 'La livraison par un tiers n’est pas encore disponible.',
+  deliveryFee: 'Frais de livraison',
+  deliveryFeePending: 'Le prix de livraison n’est pas encore configuré, donc aucuns frais ne sont facturés.',
+  placeOrder: 'Passer la commande',
+  singleCookConflict: 'Votre panier contient déjà des repas d’un autre chef. Choisissez OK pour remplacer le panier, ou Annuler pour le conserver.',
+  keptCurrentCart: 'Panier actuel conservé',
+  paymentPendingVerification: 'Le paiement n’est confirmé que lorsque le serveur le vérifie auprès de Stripe.',
+  awaitingCookAcceptance: 'Paiement reçu. Le chef doit encore accepter la commande.',
+  mixedCartBlocked: 'Ce panier contient des repas de plus d’un chef. Gardez un seul chef avant de payer.',
+  serverQuotePending: 'En attente du total du serveur.',
+  backToHome: 'Retour à l’accueil',
+  selfDelivery: 'Livraison par le chef',
+  thirdParty: 'Livraison par un tiers',
+  rating: 'Note',
+  menu: 'Menu',
+  writeReview: 'Écrire un avis',
+  submitReview: 'Envoyer l’avis',
+  pending: 'En attente',
+  confirmed: 'Confirmée',
+  preparing: 'En préparation',
+  ready: 'Prête',
+  delivered: 'Livrée',
+  cancelled: 'Annulée',
+  paymentSuccess: 'Paiement confirmé',
+  paymentSuccessMsg: 'Stripe a vérifié ce paiement. Le chef doit encore accepter la commande.',
 };
 
 const fa: typeof en = {
@@ -347,6 +411,38 @@ const fa: typeof en = {
   heroAlt: 'یک آشپز خانگی غذای آماده‌شده را به مشتری ارائه می‌کند',
   chefAlt: 'آشپز خانگی در حال آماده‌شدن برای پیوستن به بازار دیش‌بار انتاریو',
   applicationAlt: 'متقاضی آشپزی در انتاریو در حال آماده‌کردن غذای خانگی',
+  subtotal: 'جمع جزء',
+  serviceFee: 'کارمزد خدمات',
+  tax: 'مالیات',
+  taxNotApplied: 'مالیات به‌طور خودکار اضافه نمی‌شود. مالیات فقط وقتی نشان داده می‌شود که یک قاعده تنظیم‌شده اعمال شود.',
+  taxUnconfirmed: 'مالیات تأیید نشده',
+  checkoutPausedTax: 'پرداخت زنده تا بازبینی مالیات متوقف است. این مبلغ یک هزینه تأییدشده نیست.',
+  cookDeliveryUnavailable: 'ارسال توسط آشپز تا زمان تأیید و تنظیم هزینه ارسال در دسترس نیست.',
+  thirdPartyUnavailable: 'ارسال با پیک ثالث هنوز در دسترس نیست.',
+  deliveryFee: 'هزینه تحویل',
+  deliveryFeePending: 'قیمت تحویل هنوز تنظیم نشده است، بنابراین هزینه‌ای گرفته نمی‌شود.',
+  placeOrder: 'ثبت سفارش',
+  singleCookConflict: 'سبد شما از قبل غذای آشپز دیگری را دارد. تأیید یعنی جایگزینی سبد، و لغو یعنی نگه‌داشتن سبد فعلی.',
+  keptCurrentCart: 'سبد فعلی حفظ شد',
+  paymentPendingVerification: 'پرداخت تا وقتی سرور آن را با استرایپ تأیید نکند، قطعی نیست.',
+  awaitingCookAcceptance: 'پرداخت دریافت شد. آشپز هنوز باید سفارش را بپذیرد.',
+  mixedCartBlocked: 'این سبد غذای بیش از یک آشپز را دارد. پیش از پرداخت فقط یک آشپز را نگه دارید.',
+  serverQuotePending: 'در انتظار مبلغ سرور.',
+  backToHome: 'بازگشت به صفحه اصلی',
+  selfDelivery: 'تحویل توسط آشپز',
+  thirdParty: 'تحویل توسط شخص ثالث',
+  rating: 'امتیاز',
+  menu: 'منو',
+  writeReview: 'نوشتن نظر',
+  submitReview: 'ثبت نظر',
+  pending: 'در انتظار',
+  confirmed: 'تأیید شده',
+  preparing: 'در حال آماده‌سازی',
+  ready: 'آماده',
+  delivered: 'تحویل شده',
+  cancelled: 'لغو شده',
+  paymentSuccess: 'پرداخت تأیید شد',
+  paymentSuccessMsg: 'استرایپ این پرداخت را تأیید کرد. آشپز هنوز باید سفارش را بپذیرد.',
 };
 
 export const translations = { en, fr, fa };
@@ -402,13 +498,26 @@ export function saveCart(items: CartItem[]) {
   localStorage.setItem('dishbar-cart', JSON.stringify(items));
 }
 
-export function addToCart(item: Omit<CartItem, 'quantity'>) {
+export const MAX_ITEM_QUANTITY = 50;
+
+export interface AddToCartOutcome {
+  cart: CartItem[];
+  conflict: boolean;
+  existingChefName: string;
+}
+
+export function addToCart(item: Omit<CartItem, 'quantity'>, options?: { replace?: boolean }): AddToCartOutcome {
   const cart = getCart();
-  const existing = cart.find((entry) => entry.id === item.id);
-  if (existing) existing.quantity += 1;
-  else cart.push({ ...item, quantity: 1 });
-  saveCart(cart);
-  return cart;
+  const other = cart.find((entry) => entry.chef_id !== item.chef_id);
+  if (other && !options?.replace) {
+    return { cart, conflict: true, existingChefName: other.chef_name || '' };
+  }
+  const next = cart.filter((entry) => entry.chef_id === item.chef_id);
+  const existing = next.find((entry) => entry.id === item.id);
+  if (existing) existing.quantity = Math.min(MAX_ITEM_QUANTITY, existing.quantity + 1);
+  else next.push({ ...item, quantity: 1 });
+  saveCart(next);
+  return { cart: next, conflict: false, existingChefName: '' };
 }
 
 export function removeFromCart(id: number) {
@@ -421,7 +530,7 @@ export function updateCartQuantity(id: number, quantity: number) {
   const cart = getCart();
   const item = cart.find((entry) => entry.id === id);
   if (item) {
-    item.quantity = Math.max(0, quantity);
+    item.quantity = Math.max(0, Math.min(MAX_ITEM_QUANTITY, quantity));
     if (item.quantity === 0) return removeFromCart(id);
   }
   saveCart(cart);

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ArrowLeft, Heart, Package, Bell, MessageSquare, Gift, Copy,
-  RefreshCw, Star, Send, Check,
+  RefreshCw, Star, Send, Check, Trash2,
 } from 'lucide-react';
 import { client, t, getLocale, addToCart } from '@/lib/api';
 import DishBarLogo from '@/components/DishBarLogo';
@@ -153,15 +153,25 @@ export default function CustomerPortalPage() {
   const handleReorder = (order: Order) => {
     try {
       const items = JSON.parse(order.items_json || '[]');
-      items.forEach((item: any) => {
-        addToCart({
+      let replace = false;
+      for (const item of items) {
+        const payload = {
           id: item.id,
           title: item.title,
-          price: item.price,
+          price: item.price || 0,
           chef_id: item.chef_id,
           chef_name: '',
-        });
-      });
+        };
+        const outcome = addToCart(payload, { replace });
+        if (outcome.conflict && !replace) {
+          replace = window.confirm(t('singleCookConflict'));
+          if (!replace) {
+            toast.message(t('keptCurrentCart'));
+            return;
+          }
+          addToCart(payload, { replace: true });
+        }
+      }
       toast.success(locale === 'fa' ? 'آیتم‌ها به سبد اضافه شدند' : 'Items added to cart');
       navigate('/checkout');
     } catch (e) {

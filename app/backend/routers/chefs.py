@@ -227,12 +227,19 @@ async def create_chefs(
     
     service = ChefsService(db)
     try:
-        result = await service.create(data.model_dump(), user_id=str(current_user.id))
+        payload = data.model_dump()
+        if current_user.role != "admin":
+            if payload.get("is_approved"):
+                raise HTTPException(status_code=403, detail="Cooks cannot approve themselves")
+            payload["is_approved"] = False
+        result = await service.create(payload, user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create chefs")
         
         logger.info(f"Chefs created successfully with id: {result.id}")
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.error(f"Validation error creating chefs: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -255,12 +262,19 @@ async def create_chefss_batch(
     
     try:
         for item_data in request.items:
-            result = await service.create(item_data.model_dump(), user_id=str(current_user.id))
+            payload = item_data.model_dump()
+            if current_user.role != "admin":
+                if payload.get("is_approved"):
+                    raise HTTPException(status_code=403, detail="Cooks cannot approve themselves")
+                payload["is_approved"] = False
+            result = await service.create(payload, user_id=str(current_user.id))
             if result:
                 results.append(result)
         
         logger.info(f"Batch created {len(results)} chefss successfully")
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error in batch create: {str(e)}", exc_info=True)
@@ -283,12 +297,18 @@ async def update_chefss_batch(
         for item in request.items:
             # Only include non-None values for partial updates
             update_dict = {k: v for k, v in item.updates.model_dump().items() if v is not None}
+            if current_user.role != "admin" and update_dict.get("is_approved"):
+                raise HTTPException(status_code=403, detail="Cooks cannot approve themselves")
+            if current_user.role != "admin":
+                update_dict.pop("is_approved", None)
             result = await service.update(item.id, update_dict, user_id=str(current_user.id))
             if result:
                 results.append(result)
         
         logger.info(f"Batch updated {len(results)} chefss successfully")
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error in batch update: {str(e)}", exc_info=True)
@@ -309,6 +329,12 @@ async def update_chefs(
     try:
         # Only include non-None values for partial updates
         update_dict = {k: v for k, v in data.model_dump().items() if v is not None}
+        if current_user.role != "admin" and update_dict.get("is_approved"):
+            existing = await service.get_by_id(id, user_id=str(current_user.id))
+            if existing is None or not existing.is_approved:
+                raise HTTPException(status_code=403, detail="Cooks cannot approve themselves")
+        if current_user.role != "admin":
+            update_dict.pop("is_approved", None)
         result = await service.update(id, update_dict, user_id=str(current_user.id))
         if not result:
             logger.warning(f"Chefs with id {id} not found for update")

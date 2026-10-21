@@ -434,7 +434,7 @@ To report a review or community issue: support@dishbar.ca
 ## How to Reach Us
 
 **Email:** support@dishbar.ca
-**Phone:** +1-647-000-0000 (during business hours)
+**Phone:** not published. A placeholder number is not a support line.
 
 **Business Hours:**
 Monday - Friday: 9:00 AM - 8:00 PM EST

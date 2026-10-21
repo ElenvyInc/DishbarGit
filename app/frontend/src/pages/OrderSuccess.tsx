@@ -30,11 +30,11 @@ export default function OrderSuccessPage() {
         method: 'POST',
         data: { session_id: sessionId },
       });
-      if (response.data?.status === 'paid' || response.data?.payment_status === 'paid') {
+      if (response.data?.status === 'paid' && response.data?.payment_status === 'paid') {
         setVerified(true);
         clearCart();
       }
-      setOrderStatus(response.data?.status || 'confirmed');
+      setOrderStatus(response.data?.status || 'pending');
     } catch (e) {
       console.error('Verification failed:', e);
     } finally {
@@ -55,7 +55,7 @@ export default function OrderSuccessPage() {
                 {locale === 'fa' ? 'در حال تأیید پرداخت...' : locale === 'fr' ? 'Vérification du paiement...' : 'Verifying payment...'}
               </h2>
             </>
-          ) : verified || !sessionId ? (
+          ) : verified ? (
             <>
               <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-green-600" />
@@ -63,16 +63,7 @@ export default function OrderSuccessPage() {
               <h2 className="text-2xl font-bold">{t('paymentSuccess')}</h2>
               <p className="text-muted-foreground">{t('paymentSuccessMsg')}</p>
               <div className="bg-secondary/50 rounded-lg p-4 text-sm">
-                <p className="font-medium">
-                  {locale === 'fa' ? 'وضعیت سفارش: تأیید شده' : locale === 'fr' ? 'Statut: Confirmée' : 'Status: Confirmed'}
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  {locale === 'fa'
-                    ? 'آشپز شما به زودی سفارش را آماده می‌کند'
-                    : locale === 'fr'
-                    ? 'Votre chef préparera bientôt votre commande'
-                    : 'Your chef will start preparing your order soon'}
-                </p>
+                <p className="font-medium">{t('awaitingCookAcceptance')}</p>
               </div>
               <div className="flex flex-col gap-3">
                 <Button onClick={() => navigate('/')} className="cursor-pointer w-full">
@@ -89,7 +80,7 @@ export default function OrderSuccessPage() {
                 <Package className="w-8 h-8 text-yellow-600" />
               </div>
               <h2 className="text-xl font-semibold">
-                {locale === 'fa' ? 'پرداخت در حال بررسی' : locale === 'fr' ? 'Paiement en cours de vérification' : 'Payment pending verification'}
+                {t('paymentPendingVerification')}
               </h2>
               <Button onClick={() => navigate('/')} className="cursor-pointer">{t('backToHome')}</Button>
             </>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,80 +10,25 @@ import {
   ArrowLeft, Minus, Plus, Trash2, ShoppingCart,
   MapPin, Truck, CreditCard, Shield,
 } from 'lucide-react';
-import { client, t, getLocale, getCart, saveCart, removeFromCart, type CartItem } from '@/lib/api';
+import { client, t, getLocale, getCart, saveCart, removeFromCart, MAX_ITEM_QUANTITY, type CartItem } from '@/lib/api';
 import DishBarLogo from '@/components/DishBarLogo';
 import { toast } from 'sonner';
 
-// Ontario city coordinates for distance calculation
-const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  toronto: { lat: 43.6532, lng: -79.3832 },
-  mississauga: { lat: 43.5890, lng: -79.6441 },
-  brampton: { lat: 43.7315, lng: -79.7624 },
-  markham: { lat: 43.8561, lng: -79.3370 },
-  vaughan: { lat: 43.8361, lng: -79.4983 },
-  richmond_hill: { lat: 43.8828, lng: -79.4403 },
-  oakville: { lat: 43.4675, lng: -79.6877 },
-  burlington: { lat: 43.3255, lng: -79.7990 },
-  hamilton: { lat: 43.2557, lng: -79.8711 },
-  kitchener: { lat: 43.4516, lng: -80.4925 },
-  waterloo: { lat: 43.4643, lng: -80.5204 },
-  london: { lat: 42.9849, lng: -81.2453 },
-  ottawa: { lat: 45.4215, lng: -75.6972 },
-  scarborough: { lat: 43.7764, lng: -79.2318 },
-  north_york: { lat: 43.7615, lng: -79.4111 },
-  etobicoke: { lat: 43.6205, lng: -79.5132 },
-  ajax: { lat: 43.8509, lng: -79.0204 },
-  pickering: { lat: 43.8354, lng: -79.0868 },
-  oshawa: { lat: 43.8971, lng: -78.8658 },
-  whitby: { lat: 43.8975, lng: -78.9429 },
-  newmarket: { lat: 44.0592, lng: -79.4613 },
-  barrie: { lat: 44.3894, lng: -79.6903 },
-  guelph: { lat: 43.5448, lng: -80.2482 },
-  cambridge: { lat: 43.3616, lng: -80.3144 },
-  windsor: { lat: 42.3149, lng: -83.0364 },
-  st_catharines: { lat: 43.1594, lng: -79.2469 },
-  niagara_falls: { lat: 43.0896, lng: -79.0849 },
-  thunder_bay: { lat: 48.3809, lng: -89.2477 },
-  sudbury: { lat: 46.4917, lng: -80.9930 },
-  kingston: { lat: 44.2312, lng: -76.4860 },
-  peterborough: { lat: 44.3091, lng: -78.3197 },
-  default: { lat: 43.6532, lng: -79.3832 }, // Default to Toronto
-};
-
-// Haversine formula for distance calculation
-function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function getCityCoords(address: string): { lat: number; lng: number } {
-  const lower = address.toLowerCase().replace(/[^a-z\s]/g, '');
-  for (const [city, coords] of Object.entries(CITY_COORDS)) {
-    if (lower.includes(city.replace('_', ' '))) {
-      return coords;
-    }
-  }
-  // Default to Toronto if city not recognized
-  return CITY_COORDS.default;
-}
-
-// Delivery fee calculation: base + per-km rate
-function calculateDeliveryFee(distanceKm: number): number {
-  const BASE_FEE = 3.99;
-  const PER_KM_RATE = 1.50;
-  const MAX_FEE = 25.99;
-  const MIN_FEE = 3.99;
-
-  if (distanceKm <= 2) return MIN_FEE;
-  const fee = BASE_FEE + (distanceKm - 2) * PER_KM_RATE;
-  return Math.min(fee, MAX_FEE);
+interface ServerQuote {
+  food_subtotal: string;
+  service_fee: string;
+  delivery_fee: string;
+  tax: string;
+  customer_total: string;
+  service_fee_rate_label: string;
+  auto_tax_enabled: boolean;
+  tax_applied: boolean;
+  delivery_fee_pending_policy: boolean;
+  checkout_allowed?: boolean;
+  checkout_block_reason?: string;
+  cook_delivery_available?: boolean;
+  third_party_delivery_available?: boolean;
+  items?: { id: number; unit_price: string; line_total: string }[];
 }
 
 export default function CheckoutPage() {
@@ -99,14 +44,54 @@ export default function CheckoutPage() {
   const [allergenAcknowledged, setAllergenAcknowledged] = useState(false);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [chefLocation, setChefLocation] = useState('Toronto');
+  const [quote, setQuote] = useState<ServerQuote | null>(null);
+  const [quoteError, setQuoteError] = useState('');
   const locale = getLocale();
   const isRtl = locale === 'fa';
+  const mixedCooks = new Set(cartItems.map((item) => item.chef_id)).size > 1;
 
   useEffect(() => {
     checkAuth();
-    loadChefLocation();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadQuote = async () => {
+      if (cartItems.length === 0 || mixedCooks) {
+        setQuote(null);
+        return;
+      }
+      try {
+        const response = await client.apiCall.invoke({
+          url: '/api/v1/payment/quote',
+          method: 'POST',
+          data: {
+            items: cartItems.map((item) => ({ id: item.id, quantity: item.quantity })),
+            delivery_type: deliveryType,
+          },
+        });
+        if (!cancelled) {
+          setQuote(response?.data || null);
+          setQuoteError('');
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setQuote(null);
+          setQuoteError(error?.data?.detail || t('serverQuotePending'));
+        }
+      }
+    };
+    loadQuote();
+    return () => {
+      cancelled = true;
+    };
+  }, [cartItems, deliveryType, mixedCooks]);
+
+  useEffect(() => {
+    if (deliveryType === 'third_party' || (deliveryType === 'self_delivery' && !quote?.cook_delivery_available)) {
+      setDeliveryType('pickup');
+    }
+  }, [deliveryType, quote]);
 
   const checkAuth = async () => {
     try {
@@ -117,24 +102,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const loadChefLocation = async () => {
-    // Get chef location from first cart item
-    if (cartItems.length > 0) {
-      try {
-        const res = await client.entities.chefs.query({ query: { id: cartItems[0].chef_id }, limit: 1 });
-        if (res?.data?.items?.[0]?.city) {
-          setChefLocation(res.data.items[0].city);
-        }
-      } catch (e) {
-        // Use default Toronto
-      }
-    }
-  };
-
   const updateQuantity = (id: number, delta: number) => {
     const updated = cartItems.map((item) => {
       if (item.id === id) {
-        return { ...item, quantity: Math.max(1, item.quantity + delta) };
+        return { ...item, quantity: Math.min(MAX_ITEM_QUANTITY, Math.max(1, item.quantity + delta)) };
       }
       return item;
     });
@@ -147,25 +118,10 @@ export default function CheckoutPage() {
     setCartItems(updated);
   };
 
-  // Distance and delivery fee calculation
-  const { distanceKm, deliveryFee } = useMemo(() => {
-    if (deliveryType === 'pickup' || !deliveryAddress.trim()) {
-      return { distanceKm: 0, deliveryFee: 0 };
-    }
-    const chefCoords = getCityCoords(chefLocation);
-    const customerCoords = getCityCoords(deliveryAddress);
-    const dist = calculateDistance(chefCoords.lat, chefCoords.lng, customerCoords.lat, customerCoords.lng);
-    // Add some randomness for street-level realism (1-3km extra)
-    const realisticDist = dist + 1.5;
-    return {
-      distanceKm: Math.round(realisticDist * 10) / 10,
-      deliveryFee: calculateDeliveryFee(realisticDist),
-    };
-  }, [deliveryType, deliveryAddress, chefLocation]);
-
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const serviceFee = subtotal * 0.15;
-  const total = subtotal + serviceFee + deliveryFee;
+  const serverPrice = (itemId: number, fallback: number) => {
+    const priced = quote?.items?.find((entry) => entry.id === itemId);
+    return priced ? `$${priced.unit_price}` : `$${fallback.toFixed(2)}`;
+  };
 
   const handleCheckout = async () => {
     if (!user) {
@@ -188,6 +144,26 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (mixedCooks) {
+      toast.error(t('mixedCartBlocked'));
+      return;
+    }
+
+    if (!quote || quote.checkout_allowed === false) {
+      toast.error(quote?.checkout_block_reason || t('checkoutPausedTax'));
+      return;
+    }
+
+    if (deliveryType === 'self_delivery' && !quote.cook_delivery_available) {
+      toast.error(t('cookDeliveryUnavailable'));
+      return;
+    }
+
+    if (deliveryType === 'third_party') {
+      toast.error(t('thirdPartyUnavailable'));
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await client.apiCall.invoke({
@@ -196,10 +172,7 @@ export default function CheckoutPage() {
         data: {
           items: cartItems.map((item) => ({
             id: item.id,
-            title: item.title,
-            price: item.price,
             quantity: item.quantity,
-            chef_id: item.chef_id,
           })),
           delivery_type: deliveryType,
           delivery_address: deliveryAddress,
@@ -289,7 +262,7 @@ export default function CheckoutPage() {
                         {locale === 'fa' ? item.title_fa || item.title : item.title}
                       </h3>
                       <p className="text-xs text-muted-foreground">{item.chef_name}</p>
-                      <p className="text-sm font-semibold text-primary mt-1">${item.price.toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-primary mt-1">{serverPrice(item.id, item.price)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button size="icon" variant="outline" className="w-7 h-7 cursor-pointer" onClick={() => updateQuantity(item.id, -1)}>
@@ -317,7 +290,14 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <RadioGroup value={deliveryType} onValueChange={setDeliveryType}>
+                <RadioGroup
+                  value={deliveryType}
+                  onValueChange={(value) => {
+                    if (value === 'third_party') return;
+                    if (value === 'self_delivery' && !quote?.cook_delivery_available) return;
+                    setDeliveryType(value);
+                  }}
+                >
                   <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
                     <RadioGroupItem value="pickup" id="pickup" />
                     <Label htmlFor="pickup" className="cursor-pointer flex-1">
@@ -334,39 +314,29 @@ export default function CheckoutPage() {
                       </div>
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
-                    <RadioGroupItem value="self_delivery" id="self_delivery" />
-                    <Label htmlFor="self_delivery" className="cursor-pointer flex-1">
+                  <div className={`flex items-center space-x-3 p-3 rounded-lg border ${quote?.cook_delivery_available ? 'hover:bg-secondary/50' : 'opacity-60'}`}>
+                    <RadioGroupItem value="self_delivery" id="self_delivery" disabled={!quote?.cook_delivery_available} />
+                    <Label htmlFor="self_delivery" className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{t('selfDelivery')}</p>
                           <p className="text-xs text-muted-foreground">
-                            {locale === 'fa' ? 'ارسال مستقیم توسط آشپز' : locale === 'fr' ? 'Livraison par le chef' : 'Chef delivers to your address'}
+                            {quote?.cook_delivery_available
+                              ? (locale === 'fa' ? 'ارسال مستقیم توسط آشپز' : locale === 'fr' ? 'Livraison par le chef' : 'Chef delivers to your address')
+                              : t('cookDeliveryUnavailable')}
                           </p>
                         </div>
-                        {deliveryType === 'self_delivery' && deliveryAddress && (
-                          <Badge variant="outline" className="text-xs">
-                            {distanceKm} km
-                          </Badge>
-                        )}
                       </div>
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
-                    <RadioGroupItem value="third_party" id="third_party" />
-                    <Label htmlFor="third_party" className="cursor-pointer flex-1">
+                  <div className="flex items-center space-x-3 p-3 rounded-lg border opacity-60">
+                    <RadioGroupItem value="third_party" id="third_party" disabled />
+                    <Label htmlFor="third_party" className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{t('thirdParty')}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {locale === 'fa' ? 'ارسال با پیک سریع' : locale === 'fr' ? 'Livraison par coursier' : 'Fast courier delivery'}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{t('thirdPartyUnavailable')}</p>
                         </div>
-                        {deliveryType === 'third_party' && deliveryAddress && (
-                          <Badge variant="outline" className="text-xs">
-                            {distanceKm} km
-                          </Badge>
-                        )}
                       </div>
                     </Label>
                   </div>
@@ -387,41 +357,7 @@ export default function CheckoutPage() {
                       />
                     </div>
 
-                    {/* Distance & Fee Breakdown */}
-                    {deliveryAddress && (
-                      <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {locale === 'fa' ? 'فاصله تخمینی' : locale === 'fr' ? 'Distance estimée' : 'Estimated distance'}
-                          </span>
-                          <span className="font-medium">{distanceKm} km</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            {locale === 'fa' ? 'هزینه پایه' : locale === 'fr' ? 'Frais de base' : 'Base fee'}
-                          </span>
-                          <span>$3.99</span>
-                        </div>
-                        {distanceKm > 2 && (
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              {locale === 'fa' ? `هزینه مسافت (${(distanceKm - 2).toFixed(1)} km × $1.50)` : `Distance (${(distanceKm - 2).toFixed(1)} km × $1.50)`}
-                            </span>
-                            <span>${((distanceKm - 2) * 1.5).toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between text-sm font-semibold border-t pt-2">
-                          <span>{t('deliveryFee')}</span>
-                          <span className="text-primary">${deliveryFee.toFixed(2)}</span>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          {locale === 'fa'
-                            ? `از ${chefLocation} • حداکثر $25.99`
-                            : `From ${chefLocation} • Max $25.99`}
-                        </p>
-                      </div>
-                    )}
+                    <p className="text-xs text-muted-foreground">{t('deliveryFeePending')}</p>
                   </div>
                 )}
 
@@ -559,35 +495,36 @@ export default function CheckoutPage() {
               <CardContent className="p-4 space-y-3">
                 <h3 className="font-semibold">{locale === 'fa' ? 'خلاصه سفارش' : locale === 'fr' ? 'Résumé' : 'Order Summary'}</h3>
                 <div className="space-y-2 text-sm">
+                  {mixedCooks && <p className="text-destructive text-xs">{t('mixedCartBlocked')}</p>}
+                  {quoteError && <p className="text-destructive text-xs">{quoteError}</p>}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t('subtotal')}</span>
-                    <span>${subtotal.toFixed(2)}</span>
+                    <span>{quote ? `$${quote.food_subtotal}` : t('serverQuotePending')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t('commission')} (15%)</span>
-                    <span>${serviceFee.toFixed(2)}</span>
+                    <span className="text-muted-foreground">{t('serviceFee')}{quote ? ` (${quote.service_fee_rate_label})` : ''}</span>
+                    <span>{quote ? `$${quote.service_fee}` : '—'}</span>
                   </div>
-                  {deliveryFee > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <Truck className="w-3 h-3" />
-                        {t('deliveryFee')}
-                        <span className="text-[10px]">({distanceKm}km)</span>
-                      </span>
-                      <span>${deliveryFee.toFixed(2)}</span>
-                    </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('deliveryFee')}</span>
+                    <span>{quote ? `$${quote.delivery_fee}` : '—'}</span>
+                  </div>
+                  {quote?.delivery_fee_pending_policy && (
+                    <p className="text-[11px] text-muted-foreground">{t('deliveryFeePending')}</p>
                   )}
-                  {deliveryType === 'pickup' && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{t('deliveryFee')}</span>
-                      <span className="text-green-600 font-medium">
-                        {locale === 'fa' ? 'رایگان' : 'FREE'}
-                      </span>
-                    </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t('tax')}</span>
+                    <span>{quote?.tax_applied && quote.checkout_allowed !== false ? `$${quote.tax}` : t('taxUnconfirmed')}</span>
+                  </div>
+                  {quote && !quote.tax_applied && (
+                    <p className="text-[11px] text-muted-foreground">{t('taxNotApplied')}</p>
+                  )}
+                  {quote && quote.checkout_allowed === false && (
+                    <p className="text-[11px] text-destructive">{quote.checkout_block_reason || t('checkoutPausedTax')}</p>
                   )}
                   <div className="border-t pt-2 flex justify-between font-bold text-base">
                     <span>{t('total')}</span>
-                    <span className="text-primary">${total.toFixed(2)}</span>
+                    <span className="text-primary">{quote ? `$${quote.customer_total}` : '—'}</span>
                   </div>
                 </div>
 
@@ -637,7 +574,7 @@ export default function CheckoutPage() {
                   className="w-full cursor-pointer mt-4"
                   size="lg"
                   onClick={handleCheckout}
-                  disabled={loading || !allergenAcknowledged}
+                  disabled={loading || !allergenAcknowledged || mixedCooks || !quote || quote.checkout_allowed === false}
                 >
                   {loading
                     ? (locale === 'fa' ? 'در حال پردازش...' : 'Processing...')

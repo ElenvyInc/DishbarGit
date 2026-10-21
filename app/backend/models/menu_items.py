@@ -21,5 +21,6 @@ class Menu_items(Base):
     is_available = Column(Boolean, nullable=True, default=True, server_default='true')
     available_date = Column(Date, nullable=True)
     max_orders = Column(Integer, nullable=True, default=20, server_default='20')
+    reserved_quantity = Column(Integer, nullable=True, default=0, server_default='0')
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)

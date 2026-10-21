@@ -145,7 +145,7 @@ export default function ChefProfilePage() {
   };
 
   const handleAddToCart = (item: MenuItem) => {
-    const updated = addToCart({
+    const payload = {
       id: item.id,
       title: item.title,
       title_fa: item.title_fa,
@@ -153,8 +153,18 @@ export default function ChefProfilePage() {
       chef_id: item.chef_id,
       chef_name: chef?.name || '',
       image_url: item.image_url,
-    });
-    setCartItems(updated);
+    };
+    const outcome = addToCart(payload);
+    if (outcome.conflict) {
+      const replace = window.confirm(t('singleCookConflict'));
+      if (!replace) {
+        toast.message(t('keptCurrentCart'));
+        return;
+      }
+      setCartItems(addToCart(payload, { replace: true }).cart);
+    } else {
+      setCartItems(outcome.cart);
+    }
     toast.success(locale === 'fa' ? 'به سبد خرید اضافه شد' : locale === 'fr' ? 'Ajouté au panier' : 'Added to cart');
   };
 

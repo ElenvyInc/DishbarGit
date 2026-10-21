@@ -148,8 +148,12 @@ export default function AuditReportPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-2">Production Readiness Audit</h1>
-        <p className="text-muted-foreground mb-6">DishBar — Pilot Launch Assessment (July 2026)</p>
+        <h1 className="text-3xl font-bold mb-2">Historical audit snapshot</h1>
+        <p className="text-muted-foreground mb-4">DishBar — July 2026 notes. This page is not a current audit.</p>
+        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          This snapshot is stale. It is not a launch decision, and several of its claims no longer match the code.
+          Use the current remediation report instead of this page.
+        </div>
 
         {/* Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
