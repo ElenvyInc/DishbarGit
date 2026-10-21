@@ -1,323 +1,362 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Award, ChefHat, ChevronDown, ChevronUp, DollarSign, Heart,
-  Menu, Search, ShieldCheck, ShoppingCart, Truck, UserPlus, Users,
-  Utensils, X,
-} from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import DishBarLogo from '@/components/DishBarLogo';
-import { client, getCart, getLocale, setLocale, t, type Locale } from '@/lib/api';
+import { ArrowRight, Heart, MapPin, Search, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
+import DishCard, { cityLabel } from '@/components/home/DishCard';
+import { AvatarCluster, HeroPlate, StoryMarks } from '@/components/home/FoodArt';
+import SiteFooter from '@/components/layout/SiteFooter';
+import SiteHeader from '@/components/layout/SiteHeader';
+import { useI18n } from '@/i18n';
+import { addToCart, client } from '@/lib/api';
+import { SAMPLE_AREAS } from '@/data/sampleDishes';
+import { dishMatches, dishesFromResponse, type Dish, type DishFilter } from '@/lib/dishes';
 
-interface Chef {
-  id: number;
-  name: string;
-  name_fa?: string;
-  bio?: string;
-  bio_fa?: string;
-  avatar_url?: string;
-  city?: string;
-  province?: string;
-  cuisine_tags?: string;
+const FAVOURITE_KEY = 'dishbar-favourite-dishes';
+const FILTERS: DishFilter[] = ['all', 'persian', 'vegetarian', 'desserts'];
+
+const FILTER_LABEL = {
+  all: 'filterAll',
+  persian: 'filterPersian',
+  vegetarian: 'filterVegetarian',
+  desserts: 'filterDesserts',
+} as const;
+
+function readFavourites(): number[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(FAVOURITE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'number') : [];
+  } catch {
+    return [];
+  }
 }
 
-interface MenuItem {
-  id: number;
-  chef_id: number;
-  title: string;
-  title_fa?: string;
-  description?: string;
-  description_fa?: string;
-  price: number;
-  image_url?: string;
-  chef_name?: string;
-  chef_name_fa?: string;
+function writeFavourites(ids: number[]) {
+  window.localStorage.setItem(FAVOURITE_KEY, JSON.stringify(ids));
 }
-
-const FOOD_IMAGES = [
-  'https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-16/stocfpacaizq/menu-item-koobideh-kebab.png',
-  'https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-16/stocf5ycaiza/menu-item-ghormeh-sabzi.png',
-  'https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-16/stocgmqcai2q/menu-item-tahdig-saffron-rice.png',
-];
-
-const localeLabels: Record<Locale, string> = { en: 'EN', fa: 'فا', fr: 'FR' };
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const locale = getLocale();
-  const rtl = locale === 'fa';
-  const [chefs, setChefs] = useState<Chef[]>([]);
-  const [meals, setMeals] = useState<MenuItem[]>([]);
+  const { locale, t } = useI18n();
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [source, setSource] = useState<'api' | 'seed'>('seed');
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<unknown>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [faq, setFaq] = useState<number | null>(null);
-  const cartCount = getCart().reduce((sum, item) => sum + item.quantity, 0);
+  const [filter, setFilter] = useState<DishFilter>('all');
+  const [area, setArea] = useState('');
+  const [query, setQuery] = useState('');
+  const [draft, setDraft] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [saved, setSaved] = useState<number[]>(() => readFavourites());
+  const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
-    document.title = 'DishBar | Homemade Food from Local Home Chefs in Ontario';
-    Promise.all([
-      client.apiCall.invoke({ url: '/api/v1/public/chefs', method: 'GET', data: {} }),
-      client.apiCall.invoke({ url: '/api/v1/public/menu', method: 'GET', data: {} }),
-    ]).then(([chefResponse, menuResponse]) => {
-      setChefs(chefResponse.data?.items || []);
-      setMeals(menuResponse.data?.items || []);
-    }).catch(() => undefined).finally(() => setLoading(false));
+    document.title = locale === 'fa'
+      ? 'دیش‌بار | غذای واقعی. دست‌پخت آدم‌های واقعی.'
+      : locale === 'fr'
+        ? 'DishBar | De la vraie cuisine, faite par de vraies personnes.'
+        : 'DishBar | Real food. Made by real people.';
+  }, [locale]);
 
-    client.auth.me().then((response: { data?: unknown }) => setUser(response?.data || null)).catch(() => undefined);
+  useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.slice(1);
+      document.getElementById(id)?.scrollIntoView();
+    }
   }, []);
 
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-    setMobileOpen(false);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      client.apiCall.invoke({ url: '/api/v1/public/menu?limit=24', method: 'GET', data: {} }),
+      client.apiCall.invoke({ url: '/api/v1/public/chefs?limit=50', method: 'GET', data: {} }),
+    ]).then(([menuResponse, chefResponse]) => {
+      if (cancelled) return;
+      const next = dishesFromResponse(menuResponse?.data, chefResponse?.data);
+      setDishes(next.dishes);
+      setSource(next.source);
+    }).catch(() => {
+      if (cancelled) return;
+      const next = dishesFromResponse(undefined, undefined);
+      setDishes(next.dishes);
+      setSource(next.source);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    client.auth.me().then((response: { data?: unknown }) => {
+      if (!cancelled) setSignedIn(Boolean(response?.data));
+    }).catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    client.entities.favourites.query({ query: {}, limit: 50 }).then((response: { data?: { items?: { menu_item_id?: number }[] } }) => {
+      const ids = (response?.data?.items || [])
+        .map((item) => item.menu_item_id)
+        .filter((id): id is number => typeof id === 'number');
+      if (ids.length === 0) return;
+      setSaved((current) => Array.from(new Set([...current, ...ids])));
+    }).catch(() => undefined);
+  }, [signedIn]);
+
+  const areas = useMemo(() => {
+    const fromDishes = dishes.map((dish) => dish.city).filter(Boolean);
+    return Array.from(new Set([...SAMPLE_AREAS, ...fromDishes]));
+  }, [dishes]);
+
+  const visible = useMemo(
+    () => dishes.filter((dish) => dishMatches(dish, filter, area, query)),
+    [dishes, filter, area, query],
+  );
+  const shown = showAll ? visible : visible.slice(0, 6);
+
+  const onSearch = (event: FormEvent) => {
+    event.preventDefault();
+    setQuery(draft);
+    setShowAll(true);
+    document.getElementById('popular')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const name = (item: Chef | MenuItem) => locale === 'fa'
-    ? ('name_fa' in item ? item.name_fa || item.name : item.title_fa || item.title)
-    : ('name' in item ? item.name : item.title);
+  const toggleSave = async (dish: Dish) => {
+    const nextSaved = saved.includes(dish.id)
+      ? saved.filter((id) => id !== dish.id)
+      : [...saved, dish.id];
+    setSaved(nextSaved);
+    writeFavourites(nextSaved);
+    if (!signedIn || dish.source !== 'api') return;
+    try {
+      if (nextSaved.includes(dish.id)) {
+        await client.entities.favourites.create({
+          data: { chef_id: dish.chefId, menu_item_id: dish.id },
+        });
+      } else {
+        const response = await client.entities.favourites.query({
+          query: { menu_item_id: dish.id },
+          limit: 1,
+        });
+        const row = response?.data?.items?.[0];
+        if (row?.id) await client.entities.favourites.delete({ id: String(row.id) });
+      }
+    } catch {
+      /* Guest-local save still stands when the favourites API is unavailable. */
+    }
+  };
 
-  const description = (item: Chef | MenuItem) => locale === 'fa'
-    ? ('bio_fa' in item ? item.bio_fa || item.bio : item.description_fa || item.description)
-    : ('bio' in item ? item.bio : item.description);
+  const onAdd = (dish: Dish) => {
+    if (dish.source !== 'api') {
+      toast.message(t('sampleAddNotice'));
+      return;
+    }
+    addToCart({
+      id: dish.id,
+      title: dish.title,
+      title_fa: dish.titleFa,
+      price: dish.price,
+      chef_id: dish.chefId,
+      chef_name: dish.cook,
+      image_url: dish.imageUrl,
+    });
+    toast.success(t('addedToCart'));
+  };
 
-  const languagePicker = (
-    <div className="flex items-center gap-1 border rounded-lg p-1" aria-label={t('language')}>
-      {(['en', 'fa', 'fr'] as Locale[]).map((item) => (
-        <button
-          key={item}
-          onClick={() => setLocale(item)}
-          className={`px-2 py-1 text-xs rounded font-medium cursor-pointer ${locale === item ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          aria-pressed={locale === item}
-        >
-          {localeLabels[item]}
-        </button>
-      ))}
-    </div>
-  );
-
-  const faqs = [1, 2, 3, 4, 5].map((number) => ({
-    question: t(`faq${number}Q` as 'faq1Q'),
-    answer: t(`faq${number}A` as 'faq1A'),
-  }));
+  const steps = [
+    { icon: Search, title: t('findFlavour'), body: t('findFlavourBody'), wrap: 'bg-[#F8D5D0] text-[#C45342]' },
+    { icon: Heart, title: t('orderEase'), body: t('orderEaseBody'), wrap: 'bg-[#D7EFE4] text-[#1F7A56]' },
+    { icon: Sparkles, title: t('enjoySpecial'), body: t('enjoySpecialBody'), wrap: 'bg-[#F8E7B0] text-[#9A6B10]' },
+  ];
 
   return (
-    <div className="min-h-screen bg-background" dir={rtl ? 'rtl' : 'ltr'}>
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <button onClick={() => navigate('/')} aria-label={t('brand')}><DishBarLogo size="md" /></button>
-          <nav className="hidden lg:flex items-center gap-5">
-            <button onClick={() => scrollTo('marketplace')} className="text-sm font-medium text-muted-foreground hover:text-foreground">{t('browseChefs')}</button>
-            <button onClick={() => scrollTo('how-it-works')} className="text-sm font-medium text-muted-foreground hover:text-foreground">{t('howItWorks')}</button>
-            <button onClick={() => navigate('/become-a-chef')} className="text-sm font-medium text-muted-foreground hover:text-foreground">{t('becomeChefShort')}</button>
-            <button onClick={() => scrollTo('safety')} className="text-sm font-medium text-muted-foreground hover:text-foreground">{t('safety')}</button>
-            <a href="/blog/" className="text-sm font-medium text-muted-foreground hover:text-foreground">{t('blog')}</a>
-          </nav>
-          <div className="hidden lg:flex items-center gap-2">
-            {languagePicker}
-            <Button variant="ghost" size="sm" onClick={() => navigate('/checkout')} className="relative">
-              <ShoppingCart className="w-5 h-5" />
-              {cartCount > 0 && <span className="absolute -top-1 -right-1 rounded-full bg-primary text-primary-foreground text-xs w-5 h-5">{cartCount}</span>}
-            </Button>
-            {user ? (
-              <Button variant="ghost" size="sm" onClick={() => navigate('/account')}>{t('myProfile')}</Button>
-            ) : (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>{t('login')}</Button>
-                <Button size="sm" onClick={() => navigate('/signup')}>{t('signup')}</Button>
-              </>
+    <div className="min-h-screen bg-[#FBF6EF] text-[#17352C]">
+      <SiteHeader />
+      <main id="main">
+        <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-8 pt-8 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:pb-16 lg:pt-14">
+          <div>
+            <p className={`flex items-center gap-2 text-[11px] font-bold text-[#C45342] ${locale === 'fa' ? '' : 'uppercase tracking-[0.16em]'}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-[#C45342]" aria-hidden="true" />
+              {t('heroEyebrow')}
+            </p>
+            <h1 className="mt-4 max-w-xl text-[clamp(2.6rem,5vw,4.25rem)] font-extrabold leading-[1.02] tracking-[-0.045em] text-[#14352C]">
+              <span className="block">{t('heroLine1')}</span>
+              <span className="block">{t('heroLine2')}</span>
+            </h1>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-[#4E5B54] sm:text-lg">
+              {t('heroDiscover')}
+            </p>
+            <form onSubmit={onSearch} role="search" className="mt-7 flex flex-col gap-2 rounded-[28px] bg-white p-2 shadow-[0_18px_50px_-28px_rgba(20,53,44,0.45)] ring-1 ring-[#17352C]/5 sm:flex-row sm:items-center sm:rounded-full">
+              <label className="flex min-w-0 flex-1 items-center gap-2 px-3">
+                <Search className="h-4 w-4 shrink-0 text-[#7B857F]" aria-hidden="true" />
+                <span className="sr-only">{t('searchLabel')}</span>
+                <input
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder={t('searchPlaceholder')}
+                  className="w-full bg-transparent py-3 text-sm text-[#17352C] outline-none placeholder:text-[#8A938D]"
+                />
+              </label>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#C45342] px-5 py-3 text-sm font-semibold text-white hover:bg-[#B34738] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17352C] focus-visible:ring-offset-2"
+              >
+                {t('browseFood')}
+                <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+              </button>
+            </form>
+            <p className="mt-5 flex items-center gap-3 text-sm text-[#4E5B54]">
+              <AvatarCluster />
+              {t('lovedBy')}
+            </p>
+          </div>
+
+          <div className="relative">
+            <HeroPlate />
+            <p className="absolute start-[6%] top-[18%] hidden items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#17352C] shadow-sm sm:inline-flex">
+              <Sparkles className="h-3.5 w-3.5 text-[#E07A68]" aria-hidden="true" />
+              {t('madeWithCare')}
+            </p>
+            <p className="absolute bottom-[16%] end-[2%] hidden items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#17352C] shadow-sm sm:inline-flex">
+              {t('freshToday')}
+              <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
+            </p>
+            <p className="sr-only">{t('heroPlateAlt')}</p>
+          </div>
+        </section>
+
+        <section id="popular" className="mx-auto max-w-6xl px-4 py-14 sm:px-6" aria-busy={loading}>
+          <p className={`text-[11px] font-bold text-[#7B857F] ${locale === 'fa' ? '' : 'uppercase tracking-[0.16em]'}`}>
+            {t('popularEyebrow')}
+          </p>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">{t('popularTitle')}</h2>
+            {visible.length > 6 && (
+              <button
+                type="button"
+                onClick={() => setShowAll((value) => !value)}
+                className="inline-flex items-center text-sm font-semibold text-[#C45342] hover:underline"
+              >
+                {showAll ? t('showLess') : t('viewAll')}
+                <ArrowRight className="ms-1 inline h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
+              </button>
             )}
           </div>
-          <button className="lg:hidden" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Menu">
-            {mobileOpen ? <X /> : <Menu />}
-          </button>
-        </div>
-        {mobileOpen && (
-          <div className="lg:hidden border-t bg-background p-4 grid gap-3">
-            <button onClick={() => scrollTo('marketplace')} className="text-start py-2">{t('browseChefs')}</button>
-            <button onClick={() => scrollTo('how-it-works')} className="text-start py-2">{t('howItWorks')}</button>
-            <button onClick={() => navigate('/become-a-chef')} className="text-start py-2">{t('becomeChefShort')}</button>
-            <button onClick={() => scrollTo('safety')} className="text-start py-2">{t('safety')}</button>
-            <a href="/blog/" className="py-2">{t('blog')}</a>
-            {languagePicker}
-            <Button variant="ghost" onClick={() => navigate('/login')}>{t('login')}</Button>
-            <Button onClick={() => navigate('/signup')}>{t('signup')}</Button>
-          </div>
-        )}
-      </header>
 
-      <section className="relative overflow-hidden bg-gradient-to-br from-orange-50 via-background to-amber-50/30">
-        <div className="max-w-7xl mx-auto px-4 py-16 md:py-24 grid lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-8">
-            <Badge variant="secondary">{t('launchOntario')}</Badge>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight">{t('tagline')}</h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-lg">{t('heroSubtitle')}</p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" onClick={() => navigate('/become-a-chef')} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
-                <ChefHat className="w-5 h-5" />{t('becomeChef')}
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => scrollTo('marketplace')} className="gap-2 border-2 border-orange-500 text-orange-600 hover:bg-orange-50">
-                <Utensils className="w-5 h-5" />{t('browseMeals')}
-              </Button>
+          <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div role="group" aria-label={t('filtersLabel')} className="flex flex-wrap gap-2">
+              {FILTERS.map((item) => {
+                const selected = filter === item;
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => { setFilter(item); setShowAll(false); }}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17352C] ${
+                      selected ? 'bg-[#17352C] text-[#FBF6EF]' : 'bg-white text-[#17352C] ring-1 ring-[#17352C]/10 hover:bg-white/70'
+                    }`}
+                  >
+                    {t(FILTER_LABEL[item])}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              <span className="flex gap-2"><ShieldCheck className="w-4 h-4 text-amber-600" />{t('reviewedChefs')}</span>
-              <span className="flex gap-2"><DollarSign className="w-4 h-4 text-amber-600" />{t('securePayments')}</span>
-              <span className="flex gap-2"><Users className="w-4 h-4 text-orange-500" />{t('foundingChefs')}</span>
-            </div>
-          </div>
-          <div className="relative">
-            <img
-              src="https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-18/sxv67sacaiyq/hero-marketplace-chef-handoff.png"
-              alt={t('heroAlt')}
-              className="w-full rounded-3xl shadow-2xl"
-            />
-            <div className="absolute -bottom-4 -left-4 bg-card border rounded-2xl p-4 shadow-lg hidden md:flex items-center gap-3">
-              <Users className="w-6 h-6 text-green-700" />
-              <div><p className="font-bold">{t('firstCustomers')}</p><p className="text-xs text-muted-foreground">{t('launchOntario')}</p></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="how-it-works" className="py-20 bg-secondary/20">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('howItWorks')}</h2>
-            <p className="text-muted-foreground text-lg">{t('howIntro')}</p>
-          </div>
-          <div className="grid md:grid-cols-2 gap-12">
-            {[
-              { heading: t('howItWorksCustomerTitle'), icon: Utensils, steps: [[Search, t('step1Title'), t('step1Desc')], [ShoppingCart, t('step2Title'), t('step2Desc')], [Truck, t('step3Title'), t('step3Desc')]] },
-              { heading: t('howItWorksChefTitle'), icon: ChefHat, steps: [[UserPlus, t('chefStep1'), t('chefStep1Desc')], [ShieldCheck, t('chefStep2'), t('chefStep2Desc')], [Award, t('chefStep3'), t('chefStep3Desc')]] },
-            ].map((journey) => (
-              <div key={journey.heading} className="space-y-6">
-                <h3 className="text-xl font-bold flex gap-2"><journey.icon className="w-5 h-5 text-primary" />{journey.heading}</h3>
-                {journey.steps.map(([Icon, title, body]) => (
-                  <div key={String(title)} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0"><Icon className="w-5 h-5 text-primary" /></div>
-                    <div><h4 className="font-semibold">{String(title)}</h4><p className="text-sm text-muted-foreground">{String(body)}</p></div>
-                  </div>
+            <label className="relative inline-flex items-center">
+              <span className="sr-only">{t('chooseArea')}</span>
+              <MapPin className="pointer-events-none absolute start-3 h-4 w-4 text-[#17352C]" aria-hidden="true" />
+              <select
+                value={area}
+                onChange={(event) => { setArea(event.target.value); setShowAll(false); }}
+                className="appearance-none rounded-full bg-white py-2 pe-8 ps-9 text-sm font-semibold text-[#17352C] ring-1 ring-[#17352C]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17352C]"
+              >
+                <option value="">{t('chooseArea')}</option>
+                {areas.map((item) => (
+                  <option key={item} value={item}>{cityLabel(item, locale)}</option>
                 ))}
-              </div>
-            ))}
+              </select>
+            </label>
           </div>
-        </div>
-      </section>
 
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 grid lg:grid-cols-2 gap-12 items-center">
-          <img src="https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-18/sxv7cbicai2q/chef-earnings-freedom.png" alt={t('chefAlt')} className="w-full rounded-3xl shadow-lg" />
-          <div className="space-y-6">
-            <Badge variant="secondary">{t('foundingChefs')}</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold">{t('becomeChefTitle')}</h2>
-            <p className="text-lg text-muted-foreground">{t('becomeChefDesc')}</p>
-            <div className="grid grid-cols-2 gap-4">
-              {[[Award, 'flexibleSchedule', 'flexibleScheduleDesc'], [DollarSign, 'keepEarnings', 'keepEarningsDesc'], [ChefHat, 'growBusiness', 'growBusinessDesc'], [Users, 'joinCommunity', 'joinCommunityDesc']].map(([Icon, title, body]) => (
-                <div key={String(title)} className="flex gap-3"><Icon className="w-5 h-5 text-primary shrink-0" /><div><p className="font-semibold text-sm">{t(title as 'flexibleSchedule')}</p><p className="text-xs text-muted-foreground">{t(body as 'flexibleScheduleDesc')}</p></div></div>
+          {source === 'seed' && !loading && (
+            <p role="note" className="mt-5 rounded-2xl bg-[#F3E6D4] px-4 py-3 text-sm leading-relaxed text-[#17352C]">
+              <span className="font-bold">{t('sampleBadge')}. </span>
+              {t('sampleBanner')}
+            </p>
+          )}
+
+          {loading ? (
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="h-80 animate-pulse rounded-[28px] bg-[#EFE6DA]" />
               ))}
             </div>
-            <Button size="lg" onClick={() => navigate('/become-a-chef')} className="gap-2"><ChefHat className="w-5 h-5" />{t('startEarning')}</Button>
-          </div>
-        </div>
-      </section>
-
-      <section id="marketplace" className="py-20 bg-secondary/10">
-        <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold">{t('featuredChefs')}</h2>
-          <p className="text-muted-foreground mt-2 mb-10">{t('launchOntario')}</p>
-          {!loading && chefs.length === 0 && meals.length === 0 ? (
-            <Card><CardContent className="py-12 text-center space-y-5"><Utensils className="w-10 h-10 text-primary mx-auto" /><p className="text-lg text-muted-foreground max-w-2xl mx-auto">{t('noResults')}</p><Button onClick={() => client.auth.toLogin()}>{t('signup')}</Button></CardContent></Card>
+          ) : shown.length === 0 ? (
+            <p className="mt-8 text-[#4E5B54]">{t('noResults')}</p>
           ) : (
-            <>
-              <div className="grid md:grid-cols-3 gap-6">
-                {chefs.map((chef) => (
-                  <Card key={chef.id} className="cursor-pointer hover:shadow-md" onClick={() => navigate(`/chef/${chef.id}`)}>
-                    <CardContent className="p-6 text-center space-y-3">
-                      <img src={chef.avatar_url || 'https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-16/stochuycaiza/default-chef-avatar.png'} alt={name(chef)} className="w-20 h-20 rounded-full object-cover mx-auto" />
-                      <h3 className="font-bold">{name(chef)}</h3>
-                      <p className="text-sm text-muted-foreground">{chef.city}{chef.province ? `, ${chef.province}` : ''}</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{description(chef)}</p>
-                      <span className="text-sm font-medium text-primary">{t('viewChefProfile')}</span>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-                {meals.slice(0, 6).map((meal, index) => (
-                  <Card key={meal.id} className="overflow-hidden cursor-pointer" onClick={() => navigate(`/chef/${meal.chef_id}`)}>
-                    <img src={meal.image_url || FOOD_IMAGES[index % FOOD_IMAGES.length]} alt={name(meal)} className="w-full h-48 object-cover" />
-                    <CardContent className="p-4"><h3 className="font-bold">{name(meal)}</h3><p className="text-sm text-muted-foreground line-clamp-2">{description(meal)}</p><p className="font-bold mt-2">${meal.price.toFixed(2)}</p></CardContent>
-                  </Card>
-                ))}
-              </div>
-            </>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {shown.map((dish) => (
+                <DishCard
+                  key={dish.id}
+                  dish={dish}
+                  saved={saved.includes(dish.id)}
+                  onToggleSave={toggleSave}
+                  onAdd={onAdd}
+                />
+              ))}
+            </div>
           )}
-        </div>
-      </section>
+          <p className="sr-only" aria-live="polite">
+            {visible.length}
+          </p>
+        </section>
 
-      <section className="py-20 bg-gradient-to-br from-orange-50/50 to-amber-50/30">
-        <div className="max-w-7xl mx-auto px-4 grid lg:grid-cols-2 gap-12 items-center">
-          <img src="https://mgx-backend-cdn.metadl.com/generate/images/1431173/2026-07-18/sxv7bhqcaiyq/featured-chef-portrait-home.png" alt={t('applicationAlt')} className="w-full max-w-md mx-auto rounded-3xl shadow-lg" />
-          <div className="space-y-6"><h2 className="text-3xl md:text-4xl font-bold">{t('featuredChefTitle')}</h2><p className="text-lg text-muted-foreground">{t('featuredChefBody')}</p><Button variant="outline" onClick={() => navigate('/become-a-chef')}>{t('startEarning')}</Button></div>
-        </div>
-      </section>
-
-      <section className="py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold">{t('reviewTitle')}</h2>
-          <p className="text-lg text-muted-foreground mt-4">{t('reviewIntro')}</p>
-        </div>
-      </section>
-
-      <section id="safety" className="py-20 bg-secondary/20">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-12"><h2 className="text-3xl md:text-4xl font-bold">{t('trustTitle')}</h2><p className="text-lg text-muted-foreground mt-2">{t('trustSubtitle')}</p></div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[[ShieldCheck, 'reviewedChefs', 'reviewedChefsDesc'], [Award, 'foodSafety', 'foodSafetyDesc'], [DollarSign, 'securePayments', 'securePaymentsDesc'], [Heart, 'clearInformation', 'clearInformationDesc']].map(([Icon, title, body]) => (
-              <Card key={String(title)}><CardContent className="p-6 space-y-3"><Icon className="w-7 h-7 text-primary" /><h3 className="font-bold">{t(title as 'reviewedChefs')}</h3><p className="text-sm text-muted-foreground">{t(body as 'reviewedChefsDesc')}</p></CardContent></Card>
+        <section id="how-it-works" className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
+          <p className={`text-[11px] font-bold text-[#7B857F] ${locale === 'fa' ? '' : 'uppercase tracking-[0.16em]'}`}>
+            {t('howEyebrow')}
+          </p>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">{t('howDishbarWorks')}</h2>
+          <ol className="relative mt-12 grid gap-10 md:grid-cols-3">
+            <span className="absolute top-8 hidden border-t border-dashed border-[#17352C]/20 md:block md:inset-x-[16%]" aria-hidden="true" />
+            {steps.map((step) => (
+              <li key={step.title} className="relative">
+                <span className={`mx-auto grid h-16 w-16 place-items-center rounded-2xl ${step.wrap}`}>
+                  <step.icon className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-lg font-bold">{step.title}</h3>
+                <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-[#4E5B54]">{step.body}</p>
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
+          </ol>
+        </section>
 
-      <section className="py-20">
-        <div className="max-w-3xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">{t('faqTitle')}</h2>
-          <div className="space-y-3">
-            {faqs.map((item, index) => (
-              <div key={item.question} className="border rounded-xl overflow-hidden">
-                <button onClick={() => setFaq(faq === index ? null : index)} className="w-full flex justify-between p-5 text-start font-semibold hover:bg-secondary/30">
-                  <span>{item.question}</span>{faq === index ? <ChevronUp /> : <ChevronDown />}
-                </button>
-                {faq === index && <div className="px-5 pb-5 text-muted-foreground">{item.answer}</div>}
-              </div>
-            ))}
+        <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+          <div className="grid items-center gap-8 rounded-[32px] bg-[#14352C] px-6 py-10 text-[#F6F1E8] sm:px-10 md:grid-cols-[auto_1fr] md:px-14 md:py-14">
+            <StoryMarks />
+            <div>
+              <p className={`text-[11px] font-bold text-[#E7B7A8] ${locale === 'fa' ? '' : 'uppercase tracking-[0.16em]'}`}>
+                {t('cookEyebrow')}
+              </p>
+              <h2 className="mt-3 max-w-xl text-3xl font-extrabold leading-tight tracking-[-0.04em] sm:text-4xl">
+                {t('cookStoryTitle')}
+              </h2>
+              <p className="mt-4 max-w-xl text-sm leading-relaxed text-[#E4DDD2] sm:text-base">
+                {t('cookStoryBody')}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/become-a-chef')}
+                className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#C45342] px-5 py-3 text-sm font-semibold text-white hover:bg-[#B34738] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#14352C]"
+              >
+                {t('startCooking')}
+                <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <section className="py-20 bg-primary text-primary-foreground">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold">{t('readyTitle')}</h2>
-          <p className="text-lg opacity-80 my-6">{t('readyBody')}</p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button size="lg" variant="secondary" onClick={() => navigate('/become-a-chef')}>{t('becomeChef')}</Button>
-            <Button size="lg" variant="outline" onClick={() => scrollTo('marketplace')} className="!bg-transparent !hover:bg-transparent border-primary-foreground text-primary-foreground">{t('browseMeals')}</Button>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t py-12 bg-card">
-        <div className="max-w-7xl mx-auto px-4 grid md:grid-cols-4 gap-8">
-          <div><DishBarLogo size="sm" /><p className="text-sm text-muted-foreground mt-4">{t('footerBody')}</p></div>
-          <div><h3 className="font-semibold mb-3">{t('customers')}</h3><ul className="space-y-2 text-sm text-muted-foreground"><li><button onClick={() => scrollTo('marketplace')}>{t('browseChefs')}</button></li><li><button onClick={() => scrollTo('how-it-works')}>{t('howItWorks')}</button></li><li><button onClick={() => scrollTo('safety')}>{t('safety')}</button></li><li><button onClick={() => navigate('/legal/terms')}>{t('terms')}</button></li><li><button onClick={() => navigate('/legal/refund')}>{t('refundPolicy')}</button></li></ul></div>
-          <div><h3 className="font-semibold mb-3">{t('chefs')}</h3><ul className="space-y-2 text-sm text-muted-foreground"><li><button onClick={() => navigate('/become-a-chef')}>{t('becomeChefShort')}</button></li><li><button onClick={() => navigate('/legal/chef-agreement')}>{t('chefAgreement')}</button></li><li><button onClick={() => navigate('/legal/food-safety')}>{t('foodSafetyRequirements')}</button></li></ul></div>
-          <div><h3 className="font-semibold mb-3">{t('brand')}</h3><ul className="space-y-2 text-sm text-muted-foreground"><li><a href="/blog/">{t('blog')}</a></li><li><button onClick={() => navigate('/legal/privacy')}>{t('privacy')}</button></li><li><button onClick={() => navigate('/legal/contact')}>{t('contact')}</button></li></ul><div className="mt-4">{languagePicker}</div></div>
-        </div>
-        <p className="border-t max-w-7xl mx-auto mt-8 pt-8 px-4 text-center text-sm text-muted-foreground">© 2026 DishBar. {t('rights')}</p>
-      </footer>
+        </section>
+      </main>
+      <SiteFooter />
     </div>
   );
 }

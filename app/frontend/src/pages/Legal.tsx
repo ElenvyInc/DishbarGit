@@ -1,8 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import DishBarLogo from '@/components/DishBarLogo';
-import { getLocale } from '@/lib/api';
+import SiteFooter from '@/components/layout/SiteFooter';
+import SiteHeader from '@/components/layout/SiteHeader';
+import { getLocale, t } from '@/lib/api';
 
 const LEGAL_PAGES: Record<string, { title: string; titleFa: string; titleFr: string; content: string }> = {
   terms: {
@@ -503,16 +503,7 @@ export default function LegalPage() {
 
   return (
     <div className="min-h-screen bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            {locale === 'fa' ? 'بازگشت' : locale === 'fr' ? 'Retour' : 'Back'}
-          </Button>
-          <DishBarLogo size="sm" />
-          <div className="w-16" />
-        </div>
-      </header>
+      <SiteHeader variant="compact" onBack={() => navigate(-1)} backLabel={t('back')} />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">{title}</h1>
@@ -548,6 +539,7 @@ export default function LegalPage() {
           </div>
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

@@ -22,6 +22,8 @@ const copy = {
     back: 'Back to DishBar',
     switchLogin: 'Already have an account? Sign in',
     switchSignup: 'New to DishBar? Create an account',
+    panelTitle: 'Real food, shared with your community.',
+    panelBody: 'Discover local home cooks, order with confidence, and help build Ontario’s DishBar community.',
   },
   fr: {
     loginTitle: 'Bon retour sur DishBar',
@@ -37,6 +39,8 @@ const copy = {
     back: 'Retour à DishBar',
     switchLogin: 'Vous avez déjà un compte? Se connecter',
     switchSignup: 'Nouveau sur DishBar? Créer un compte',
+    panelTitle: 'De la vraie cuisine, partagée avec votre communauté.',
+    panelBody: 'Découvrez des cuisiniers locaux, commandez en confiance et aidez à bâtir la communauté DishBar en Ontario.',
   },
   fa: {
     loginTitle: 'به دیش‌بار خوش آمدید',
@@ -52,6 +56,8 @@ const copy = {
     back: 'بازگشت به دیش‌بار',
     switchLogin: 'حساب دارید؟ وارد شوید',
     switchSignup: 'تازه به دیش‌بار پیوسته‌اید؟ حساب بسازید',
+    panelTitle: 'غذای واقعی، در میان جامعه شما.',
+    panelBody: 'آشپزهای محلی را پیدا کنید، با اطمینان سفارش دهید و به ساخت جامعه دیش‌بار در انتاریو کمک کنید.',
   },
 } as const;
 
@@ -67,17 +73,17 @@ export default function AuthPage({ mode }: { mode: AuthMode }) {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-background to-amber-50/40 px-4 py-8" dir={rtl ? 'rtl' : 'ltr'}>
+    <main className="min-h-screen bg-[#FBF6EF] px-4 py-8" dir={rtl ? 'rtl' : 'ltr'}>
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl items-center justify-center">
         <div className="grid w-full overflow-hidden rounded-3xl border bg-card shadow-xl md:grid-cols-2">
-          <section className="hidden bg-gradient-to-br from-orange-500 to-amber-600 p-10 text-white md:flex md:flex-col md:justify-between">
+          <section className="hidden bg-[#14352C] p-10 text-[#F6F1E8] md:flex md:flex-col md:justify-between">
             <button onClick={() => navigate('/')} className="w-fit">
-              <DishBarLogo size="md" />
+              <DishBarLogo size="md" tone="light" />
             </button>
             <div className="space-y-6">
-              <ChefHat className="h-12 w-12" />
-              <h2 className="text-4xl font-extrabold leading-tight">Homemade food, shared with your community.</h2>
-              <p className="text-white/85">Discover local home chefs, order with confidence, and help build Ontario’s first DishBar community.</p>
+              <ChefHat className="h-12 w-12 text-[#E07A68]" />
+              <h2 className="text-4xl font-extrabold leading-tight">{text.panelTitle}</h2>
+              <p className="text-[#E4DDD2]">{text.panelBody}</p>
             </div>
             <div className="flex items-center gap-2 text-sm text-white/85">
               <ShieldCheck className="h-5 w-5" /> {text.secure}
@@ -89,8 +95,8 @@ export default function AuthPage({ mode }: { mode: AuthMode }) {
               <button onClick={() => navigate('/')} className="md:hidden">
                 <DishBarLogo size="md" />
               </button>
-              <button onClick={() => navigate('/')} className="ml-auto flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" /> {text.back}
+              <button onClick={() => navigate('/')} className="ms-auto flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {text.back}
               </button>
             </div>
 

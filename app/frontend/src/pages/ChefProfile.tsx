@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Star, ArrowLeft, Plus, Minus, ShoppingCart, MapPin, Heart } from 'lucide-react';
+import { Star, Plus, Minus, ShoppingCart, MapPin, Heart } from 'lucide-react';
 import { client, t, getLocale, addToCart, getCart, type CartItem } from '@/lib/api';
-import DishBarLogo from '@/components/DishBarLogo';
+import SiteHeader from '@/components/layout/SiteHeader';
 
 // Appetizing Persian food placeholder images
 const FOOD_PLACEHOLDERS = [
@@ -224,23 +224,21 @@ export default function ChefProfilePage() {
   return (
     <div className="min-h-screen bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            {t('backToHome')}
-          </Button>
-          <DishBarLogo size="sm" />
-          <Button variant="outline" size="sm" onClick={() => navigate('/checkout')} className="cursor-pointer relative">
+      <SiteHeader
+        variant="compact"
+        onBack={() => navigate('/')}
+        backLabel={t('backToHome')}
+        trailing={
+          <Button variant="outline" size="sm" onClick={() => navigate('/checkout')} className="cursor-pointer relative rounded-full" aria-label={t('cart')}>
             <ShoppingCart className="w-4 h-4" />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -end-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
                 {cartCount}
               </span>
             )}
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {/* Chef Profile Header */}
       <section className="bg-card border-b">

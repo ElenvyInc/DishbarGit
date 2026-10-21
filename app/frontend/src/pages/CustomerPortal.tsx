@@ -7,11 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  ArrowLeft, Heart, Package, Bell, MessageSquare, Gift, Copy,
+  Heart, Package, Bell, MessageSquare, Gift, Copy, Trash2,
   RefreshCw, Star, Send, Check,
 } from 'lucide-react';
 import { client, t, getLocale, addToCart } from '@/lib/api';
-import DishBarLogo from '@/components/DishBarLogo';
+import SiteHeader from '@/components/layout/SiteHeader';
 import { toast } from 'sonner';
 
 interface Order {
@@ -265,17 +265,16 @@ export default function CustomerPortalPage() {
   return (
     <div className="min-h-screen bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" /> {t('backToHome')}
-          </Button>
-          <DishBarLogo size="sm" />
+      <SiteHeader
+        variant="compact"
+        onBack={() => navigate('/')}
+        backLabel={t('backToHome')}
+        trailing={
           <Button variant="ghost" size="sm" onClick={() => { client.auth.logout(); navigate('/'); }} className="cursor-pointer">
             {t('logout')}
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">

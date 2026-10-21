@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
-import DishBarLogo from '@/components/DishBarLogo';
+import { CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
+import SiteHeader from '@/components/layout/SiteHeader';
 
 type Status = 'working' | 'partial' | 'mock' | 'missing' | 'risk';
 
@@ -137,15 +137,7 @@ export default function AuditReportPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" /> Admin
-          </Button>
-          <DishBarLogo size="sm" />
-          <div className="w-16" />
-        </div>
-      </header>
+      <SiteHeader variant="compact" onBack={() => navigate('/admin')} backLabel="Admin" />
 
       <div className="max-w-5xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-2">Production Readiness Audit</h1>

@@ -1,9 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { blogPosts, getBlogRoute } from '@/lib/blog';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, BookOpen } from 'lucide-react';
-import DishBarLogo from '@/components/DishBarLogo';
+import { BookOpen } from 'lucide-react';
+import SiteFooter from '@/components/layout/SiteFooter';
+import SiteHeader from '@/components/layout/SiteHeader';
 
 const BlogIndexPage = () => {
   const navigate = useNavigate();
@@ -11,15 +11,7 @@ const BlogIndexPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" /> Home
-          </Button>
-          <DishBarLogo size="sm" />
-          <div className="w-20" />
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
         <div className="max-w-3xl space-y-4 mb-12">
@@ -89,11 +81,7 @@ const BlogIndexPage = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-8 bg-card">
-        <div className="max-w-5xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          © 2026 DishBar. All rights reserved.
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };

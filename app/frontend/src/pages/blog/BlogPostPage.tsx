@@ -1,8 +1,8 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getBlogPost, getPostSeoMeta } from '@/lib/blog';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import DishBarLogo from '@/components/DishBarLogo';
+import SiteFooter from '@/components/layout/SiteFooter';
+import SiteHeader from '@/components/layout/SiteHeader';
 import { BlogArticleLayout } from '@/components/blog/BlogArticleLayout';
 import { MarkdownArticle } from '@/components/blog/MarkdownArticle';
 import { useEffect } from 'react';
@@ -34,33 +34,14 @@ const BlogPostPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/blog')} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" /> Blog
-          </Button>
-          <DishBarLogo size="sm" />
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="cursor-pointer">
-            Home
-          </Button>
-        </div>
-      </header>
+      <SiteHeader variant="compact" onBack={() => navigate('/blog')} backLabel="Blog" />
 
       <BlogArticleLayout title={post.title} description={post.description}>
         <MarkdownArticle content={post.markdown} />
       </BlogArticleLayout>
 
       {/* Footer */}
-      <footer className="border-t py-8 bg-card">
-        <div className="max-w-5xl mx-auto px-4 text-center">
-          <Link to="/blog" className="text-sm font-medium text-primary hover:underline">
-            ← Back to all articles
-          </Link>
-          <p className="mt-4 text-sm text-muted-foreground">
-            © 2026 DishBar. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };
