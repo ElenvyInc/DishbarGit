@@ -295,6 +295,9 @@ async def create_payment_session(
 
         # Get platform settings for fee calculation
         commission_rate_str = await _get_setting(db, "platform_commission_rate", "0.15")
+        tax_reviewed = await _get_setting(db, "tax_configuration_reviewed", "false")
+        if tax_reviewed.lower() != "true":
+            raise HTTPException(status_code=503, detail="Checkout is paused pending tax configuration review.")
         tax_rate_str = await _get_setting(db, "tax_rate", "")
         service_fee_rate_str = await _get_setting(db, "customer_service_fee_rate", "0.03")
         min_order_str = await _get_setting(db, "minimum_order_amount", "15.00")
