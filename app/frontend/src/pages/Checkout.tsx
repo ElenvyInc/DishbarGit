@@ -164,10 +164,19 @@ export default function CheckoutPage() {
   }, [deliveryType, deliveryAddress, chefLocation]);
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const serviceFee = subtotal * 0.15;
+  const serviceFee = subtotal * 0.03;
   const total = subtotal + serviceFee + deliveryFee;
+  const multipleCooks = new Set(cartItems.map(item => item.chef_id)).size > 1;
 
   const handleCheckout = async () => {
+    if (multipleCooks) {
+      toast.error('Please place a separate order for each cook.');
+      return;
+    }
+    if (deliveryType !== 'pickup') {
+      toast.error('Delivery is unavailable until verified delivery pricing is configured. Please choose pickup.');
+      return;
+    }
     if (!user) {
       client.auth.toLogin();
       return;
@@ -335,7 +344,7 @@ export default function CheckoutPage() {
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
-                    <RadioGroupItem value="self_delivery" id="self_delivery" />
+                    <RadioGroupItem value="self_delivery" id="self_delivery" disabled />
                     <Label htmlFor="self_delivery" className="cursor-pointer flex-1">
                       <div className="flex items-center justify-between">
                         <div>
@@ -353,7 +362,7 @@ export default function CheckoutPage() {
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
-                    <RadioGroupItem value="third_party" id="third_party" />
+                    <RadioGroupItem value="third_party" id="third_party" disabled />
                     <Label htmlFor="third_party" className="cursor-pointer flex-1">
                       <div className="flex items-center justify-between">
                         <div>
