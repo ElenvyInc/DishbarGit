@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
-  ArrowLeft, Minus, Plus, Trash2, ShoppingCart,
+  Minus, Plus, Trash2, ShoppingCart,
   MapPin, Truck, CreditCard, Shield,
 } from 'lucide-react';
 import { client, t, getLocale, getCart, saveCart, removeFromCart, type CartItem } from '@/lib/api';
-import DishBarLogo from '@/components/DishBarLogo';
+import SiteHeader from '@/components/layout/SiteHeader';
 import { toast } from 'sonner';
 
 // Ontario city coordinates for distance calculation
@@ -259,16 +259,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            {locale === 'fa' ? 'بازگشت' : locale === 'fr' ? 'Retour' : 'Back'}
-          </Button>
-          <DishBarLogo size="sm" />
-          <div className="w-20" />
-        </div>
-      </header>
+      <SiteHeader variant="compact" onBack={() => navigate(-1)} backLabel={t('back')} />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6">{t('checkout')}</h1>

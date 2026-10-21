@@ -7,9 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChefHat, Plus, Package, DollarSign, Star, ArrowLeft, Trash2 } from 'lucide-react';
+import { ChefHat, Plus, Package, DollarSign, Star, Trash2 } from 'lucide-react';
 import { client, t, getLocale } from '@/lib/api';
-import DishBarLogo from '@/components/DishBarLogo';
+import SiteHeader from '@/components/layout/SiteHeader';
 import { toast } from 'sonner';
 
 interface ChefProfile {
@@ -220,17 +220,16 @@ export default function ChefDashboardPage() {
   return (
     <div className="min-h-screen bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="cursor-pointer gap-2">
-            <ArrowLeft className="w-4 h-4" /> {t('backToHome')}
-          </Button>
-          <DishBarLogo size="sm" />
+      <SiteHeader
+        variant="compact"
+        onBack={() => navigate('/')}
+        backLabel={t('backToHome')}
+        trailing={
           <Button variant="ghost" size="sm" onClick={() => { client.auth.logout(); navigate('/'); }} className="cursor-pointer">
             {t('logout')}
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Stats */}

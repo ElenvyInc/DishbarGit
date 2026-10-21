@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,10 +8,10 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { client, t, getLocale } from '@/lib/api';
-import DishBarLogo from '@/components/DishBarLogo';
+import SiteFooter from '@/components/layout/SiteFooter';
+import SiteHeader from '@/components/layout/SiteHeader';
 
 export default function BecomeAChef() {
-  const navigate = useNavigate();
   const locale = getLocale();
   const isRtl = locale === 'fa';
   const [mealsPerWeek, setMealsPerWeek] = useState(20);
@@ -52,16 +51,7 @@ export default function BecomeAChef() {
   return (
     <div className="min-h-screen bg-background" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Simple Header */}
-      <header className="border-b bg-background/95 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="cursor-pointer" onClick={() => navigate('/')}>
-            <DishBarLogo size="md" />
-          </div>
-          <Button size="sm" onClick={() => client.auth.toLogin()} className="cursor-pointer">
-            {t('login')}
-          </Button>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-orange-50 via-background to-amber-50/30 py-20">
@@ -246,17 +236,7 @@ export default function BecomeAChef() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-8 bg-card">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <DishBarLogo size="sm" />
-          <p className="text-sm text-muted-foreground">
-            © 2026 DishBar. A marketplace for homemade food in Ontario, Canada.
-          </p>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="cursor-pointer">
-            ← Back to Home
-          </Button>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
