@@ -5,6 +5,7 @@ and proper order workflow.
 import json
 import logging
 from datetime import datetime, date, time as dtime
+from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, func, and_, update
@@ -258,9 +259,10 @@ async def create_payment_session(
 ):
     """Create a Stripe checkout session with full validation"""
     try:
-        frontend_host = request.headers.get("App-Host")
-        if frontend_host and not frontend_host.startswith(("http://", "https://")):
-            frontend_host = f"https://{frontend_host}"
+        frontend_host = getattr(settings, "frontend_url", "")
+        if not frontend_host or not frontend_host.startswith("https://"):
+            raise HTTPException(status_code=503, detail="Checkout redirect configuration is unavailable.")
+        frontend_host = frontend_host.rstrip("/")
 
         if not data.items:
             raise HTTPException(status_code=400, detail="Cart is empty")
@@ -278,6 +280,10 @@ async def create_payment_session(
         # Validate pilot mode restrictions
         await _validate_pilot_mode(db, data.delivery_postal_code, data.delivery_type)
 
+        if len({item.chef_id for item in data.items}) != 1:
+            raise HTTPException(status_code=400, detail="Order from one cook at a time.")
+        if any(item.quantity < 1 or item.quantity > 100 for item in data.items):
+            raise HTTPException(status_code=400, detail="Invalid item quantity.")
         # Validate chef is active
         chef = await _validate_chef(db, data.items[0].chef_id)
 
@@ -286,19 +292,27 @@ async def create_payment_session(
 
         # Get platform settings for fee calculation
         commission_rate_str = await _get_setting(db, "platform_commission_rate", "0.15")
-        tax_rate_str = await _get_setting(db, "tax_rate", "0.13")
+        tax_rate_str = await _get_setting(db, "tax_rate", "")
+        service_fee_rate_str = await _get_setting(db, "customer_service_fee_rate", "0.03")
         min_order_str = await _get_setting(db, "minimum_order_amount", "15.00")
         base_fee_str = await _get_setting(db, "base_delivery_fee", "3.99")
         max_fee_str = await _get_setting(db, "max_delivery_fee", "15.00")
 
         commission_rate = float(commission_rate_str)
+        if not tax_rate_str:
+            raise HTTPException(status_code=503, detail="Checkout requires tax configuration review.")
         tax_rate = float(tax_rate_str)
+        service_fee_rate = float(service_fee_rate_str)
         min_order = float(min_order_str)
         base_delivery_fee = float(base_fee_str)
         max_delivery_fee = float(max_fee_str)
 
         # Calculate amounts server-side (NEVER trust frontend amounts)
-        subtotal = sum(item.price * item.quantity for item in data.items)
+        menu_rows = (await db.execute(select(Menu_items).where(Menu_items.id.in_([item.id for item in data.items])))).scalars().all()
+        menu_by_id = {item.id: item for item in menu_rows}
+        if len(menu_by_id) != len(data.items) or any(menu_by_id[item.id].chef_id != item.chef_id for item in data.items):
+            raise HTTPException(status_code=400, detail="Invalid or duplicate menu item.")
+        subtotal = sum((Decimal(str(menu_by_id[item.id].price)) * item.quantity for item in data.items), Decimal("0")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         # Minimum order check
         if subtotal < min_order:
@@ -314,9 +328,10 @@ async def create_payment_session(
             delivery_fee = min(base_delivery_fee, max_delivery_fee)
 
         # Calculate tax and commission
-        tax = subtotal * tax_rate
-        commission = subtotal * commission_rate
-        total = subtotal + delivery_fee + tax
+        tax = (subtotal * Decimal(str(tax_rate))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        commission = (subtotal * Decimal(str(commission_rate))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        service_fee = (subtotal * Decimal(str(service_fee_rate))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        total = subtotal + Decimal(str(delivery_fee)) + tax + service_fee
         chef_amount = subtotal - commission
 
         # Create order in database
@@ -362,10 +377,13 @@ async def create_payment_session(
                 "price_data": {
                     "currency": "cad",
                     "product_data": {"name": item.title},
-                    "unit_amount": int(item.price * 100),
+                    "unit_amount": int((Decimal(str(menu_by_id[item.id].price)) * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
                 },
                 "quantity": item.quantity,
             })
+
+        if service_fee > 0:
+            line_items.append({"price_data": {"currency": "cad", "product_data": {"name": "DishBar service fee"}, "unit_amount": int(service_fee * 100)}, "quantity": 1})
 
         # Add tax as line item
         if tax > 0:
@@ -480,6 +498,12 @@ async def stripe_webhook(
         raise HTTPException(status_code=404, detail="Order not found")
 
     if event_type in {"checkout.session.completed", "checkout.session.async_payment_succeeded"}:
+        if session.get("payment_status") != "paid":
+            return {"received": True, "handled": False, "reason": "payment_not_paid"}
+        if order.stripe_session_id and order.stripe_session_id != session.get("id"):
+            raise HTTPException(status_code=400, detail="Session mismatch")
+        if session.get("currency", "").lower() != "cad" or session.get("amount_total") != round(order.total_amount * 100):
+            raise HTTPException(status_code=400, detail="Payment amount mismatch")
         order.payment_status = "paid"
         order.status = "confirmed"
     elif event_type == "checkout.session.async_payment_failed":
@@ -517,7 +541,7 @@ async def verify_payment(
 
             if order:
                 status_mapping = {"complete": "paid", "open": "pending", "expired": "cancelled"}
-                payment_status = status_mapping.get(session.status, "pending")
+                payment_status = "paid" if session.payment_status == "paid" else ("cancelled" if session.status == "expired" else "pending")
 
                 # Only update if status actually changed (prevent duplicate processing)
                 if order.payment_status != payment_status:
