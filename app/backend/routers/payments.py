@@ -26,7 +26,7 @@ from dependencies.auth import get_current_user
 from models.commerce import StripeWebhookEvent
 from models.orders import Orders
 from schemas.auth import UserResponse
-from services.cart_validation import enforce_pilot_restrictions, resolve_cart
+from services.cart_validation import cook_delivery_available, enforce_pilot_restrictions, resolve_cart
 from services.inventory import (
     MAX_ITEM_QUANTITY,
     consume_order_reservations,
@@ -36,7 +36,7 @@ from services.inventory import (
     reserve_menu_item,
     InventoryError,
 )
-from services.pricing import OrderMoney, cents_to_decimal, stripe_line_items
+from services.pricing import OrderMoney, cents_to_decimal, live_checkout_block_reason, stripe_line_items
 
 router = APIRouter(prefix="/api/v1/payment", tags=["payment"])
 logger = logging.getLogger(__name__)
@@ -90,10 +90,15 @@ class VerifyResponse(BaseModel):
     payment_status: str
 
 
-def _public_money(money: OrderMoney, lines, chef_id: int) -> dict:
+def _public_money(money: OrderMoney, lines, chef_id: int, settings: dict) -> dict:
     payload = money.public_dict()
+    block_reason = live_checkout_block_reason(settings)
     payload["chef_id"] = chef_id
     payload["acceptance_policy"] = "not_configured"
+    payload["checkout_allowed"] = block_reason is None
+    payload["checkout_block_reason"] = block_reason or ""
+    payload["cook_delivery_available"] = cook_delivery_available(settings)
+    payload["third_party_delivery_available"] = False
     payload["items"] = [
         {
             "id": line.item.id,
@@ -185,8 +190,8 @@ async def quote_cart(
 ):
     """Return the server price breakdown. Does not reserve stock or create an order."""
     try:
-        _chef, lines, money, _settings = await resolve_cart(db, data.items, data.delivery_type)
-        return _public_money(money, lines, _chef.id)
+        _chef, lines, money, settings = await resolve_cart(db, data.items, data.delivery_type)
+        return _public_money(money, lines, _chef.id, settings)
     except HTTPException:
         raise
     except Exception:
@@ -213,12 +218,12 @@ async def create_payment_session(
             raise HTTPException(status_code=400, detail="You must acknowledge the allergen notice before ordering")
 
         origin = resolve_checkout_origin(request.headers.get("App-Host"))
-        idempotency_key = request.headers.get("Idempotency-Key") or ""
-        if len(idempotency_key) > 255:
-            raise HTTPException(status_code=400, detail="Idempotency-Key is too long")
         await release_expired_reservations(db)
         await db.commit()
         chef, lines, money, settings = await resolve_cart(db, data.items, data.delivery_type)
+        block_reason = live_checkout_block_reason(settings)
+        if block_reason:
+            raise HTTPException(status_code=503, detail=block_reason)
         await enforce_pilot_restrictions(db, settings, data.delivery_postal_code, data.delivery_type)
 
         server_items = [
@@ -284,8 +289,8 @@ async def create_payment_session(
                 detail="Online payment is temporarily unavailable. Please try again later or contact support.",
             )
 
-        if not idempotency_key:
-            idempotency_key = f"dishbar-order-{order_id}"
+        # Ignore a client Idempotency-Key. The key is bound to this order id only.
+        idempotency_key = f"dishbar-order-{order_id}"
 
         stripe_params = {
             "payment_method_types": ["card"],

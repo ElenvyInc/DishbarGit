@@ -93,6 +93,24 @@ async def enforce_pilot_restrictions(
                 raise HTTPException(status_code=400, detail="Delivery is not available in your area.")
 
 
+def cook_delivery_available(settings: dict[str, str]) -> bool:
+    approved = str(settings.get("cook_delivery_approved", "false")).strip().lower() == "true"
+    priced = str(settings.get("delivery_pricing_enabled", "false")).strip().lower() == "true"
+    return approved and priced
+
+
+def _reject_unapproved_fulfilment(delivery_type: str, settings: dict[str, str]) -> None:
+    if delivery_type == "pickup":
+        return
+    if delivery_type == "third_party":
+        raise HTTPException(status_code=400, detail="Third-party delivery is not available yet. Choose pickup.")
+    if delivery_type == "self_delivery" and not cook_delivery_available(settings):
+        raise HTTPException(
+            status_code=400,
+            detail="Cook delivery is not available until it is approved and a delivery fee is configured. Choose pickup.",
+        )
+
+
 async def load_settings_map(db: AsyncSession) -> dict[str, str]:
     result = await db.execute(select(Platform_settings))
     return {row.key: row.value for row in result.scalars().all()}
@@ -147,6 +165,7 @@ async def resolve_cart(
         resolved.append(ResolvedLine(item=item, quantity=line.quantity, unit_cents=price_to_cents(item.price)))
 
     settings = await load_settings_map(db)
+    _reject_unapproved_fulfilment(delivery_type, settings)
     food_subtotal = sum(line.line_cents for line in resolved)
     if str(settings.get("minimum_order_enforced", "false")).lower() == "true":
         minimum = price_to_cents(settings.get("minimum_order_amount", "0") or "0")

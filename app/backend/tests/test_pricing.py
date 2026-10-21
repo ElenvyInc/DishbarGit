@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from services.pricing import calculate_order_money, cents_to_str, stripe_line_items
+from services.pricing import calculate_order_money, cents_to_str, live_checkout_block_reason, stripe_line_items
 
 
 def test_cad_45_approved_breakdown_matches_stripe_charge():
@@ -52,6 +52,33 @@ def test_delivery_pricing_stays_off_by_default():
     assert money.delivery_fee_cents == 0
     assert money.delivery_fee_pending_policy is True
     assert money.customer_total_cents == 4635
+
+
+def test_live_checkout_stays_closed_until_a_reviewed_rule_exists():
+    assert live_checkout_block_reason({}) is not None
+    assert live_checkout_block_reason({"tax_rate": "0.13"}) is not None
+    assert live_checkout_block_reason({"tax_rate": "0", "auto_tax_enabled": "false"}) is not None
+    assert (
+        live_checkout_block_reason(
+            {
+                "tax_configuration_reviewed": "true",
+                "auto_tax_enabled": "true",
+                "tax_rate": "0.13",
+                "tax_rules": '{"rules": []}',
+            }
+        )
+        is not None
+    )
+    assert (
+        live_checkout_block_reason(
+            {
+                "tax_configuration_reviewed": "true",
+                "auto_tax_enabled": "true",
+                "tax_rules": '{"rules":[{"rate":"0","applies_to":"food_subtotal","enabled":true}]}',
+            }
+        )
+        is None
+    )
 
 
 def test_out_of_range_rate_falls_back_to_approved_defaults():

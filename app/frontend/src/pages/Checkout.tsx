@@ -24,6 +24,10 @@ interface ServerQuote {
   auto_tax_enabled: boolean;
   tax_applied: boolean;
   delivery_fee_pending_policy: boolean;
+  checkout_allowed?: boolean;
+  checkout_block_reason?: string;
+  cook_delivery_available?: boolean;
+  third_party_delivery_available?: boolean;
   items?: { id: number; unit_price: string; line_total: string }[];
 }
 
@@ -83,6 +87,12 @@ export default function CheckoutPage() {
     };
   }, [cartItems, deliveryType, mixedCooks]);
 
+  useEffect(() => {
+    if (deliveryType === 'third_party' || (deliveryType === 'self_delivery' && !quote?.cook_delivery_available)) {
+      setDeliveryType('pickup');
+    }
+  }, [deliveryType, quote]);
+
   const checkAuth = async () => {
     try {
       const res = await client.auth.me();
@@ -136,6 +146,21 @@ export default function CheckoutPage() {
 
     if (mixedCooks) {
       toast.error(t('mixedCartBlocked'));
+      return;
+    }
+
+    if (!quote || quote.checkout_allowed === false) {
+      toast.error(quote?.checkout_block_reason || t('checkoutPausedTax'));
+      return;
+    }
+
+    if (deliveryType === 'self_delivery' && !quote.cook_delivery_available) {
+      toast.error(t('cookDeliveryUnavailable'));
+      return;
+    }
+
+    if (deliveryType === 'third_party') {
+      toast.error(t('thirdPartyUnavailable'));
       return;
     }
 
@@ -265,7 +290,14 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <RadioGroup value={deliveryType} onValueChange={setDeliveryType}>
+                <RadioGroup
+                  value={deliveryType}
+                  onValueChange={(value) => {
+                    if (value === 'third_party') return;
+                    if (value === 'self_delivery' && !quote?.cook_delivery_available) return;
+                    setDeliveryType(value);
+                  }}
+                >
                   <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
                     <RadioGroupItem value="pickup" id="pickup" />
                     <Label htmlFor="pickup" className="cursor-pointer flex-1">
@@ -282,39 +314,29 @@ export default function CheckoutPage() {
                       </div>
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
-                    <RadioGroupItem value="self_delivery" id="self_delivery" />
-                    <Label htmlFor="self_delivery" className="cursor-pointer flex-1">
+                  <div className={`flex items-center space-x-3 p-3 rounded-lg border ${quote?.cook_delivery_available ? 'hover:bg-secondary/50' : 'opacity-60'}`}>
+                    <RadioGroupItem value="self_delivery" id="self_delivery" disabled={!quote?.cook_delivery_available} />
+                    <Label htmlFor="self_delivery" className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{t('selfDelivery')}</p>
                           <p className="text-xs text-muted-foreground">
-                            {locale === 'fa' ? 'ارسال مستقیم توسط آشپز' : locale === 'fr' ? 'Livraison par le chef' : 'Chef delivers to your address'}
+                            {quote?.cook_delivery_available
+                              ? (locale === 'fa' ? 'ارسال مستقیم توسط آشپز' : locale === 'fr' ? 'Livraison par le chef' : 'Chef delivers to your address')
+                              : t('cookDeliveryUnavailable')}
                           </p>
                         </div>
-                        {deliveryType === 'self_delivery' && (
-                          <Badge variant="outline" className="text-xs">
-                            {t('deliveryFeePending')}
-                          </Badge>
-                        )}
                       </div>
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors">
-                    <RadioGroupItem value="third_party" id="third_party" />
-                    <Label htmlFor="third_party" className="cursor-pointer flex-1">
+                  <div className="flex items-center space-x-3 p-3 rounded-lg border opacity-60">
+                    <RadioGroupItem value="third_party" id="third_party" disabled />
+                    <Label htmlFor="third_party" className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{t('thirdParty')}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {locale === 'fa' ? 'ارسال با پیک سریع' : locale === 'fr' ? 'Livraison par coursier' : 'Fast courier delivery'}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{t('thirdPartyUnavailable')}</p>
                         </div>
-                        {deliveryType === 'third_party' && (
-                          <Badge variant="outline" className="text-xs">
-                            {t('deliveryFeePending')}
-                          </Badge>
-                        )}
                       </div>
                     </Label>
                   </div>
@@ -492,10 +514,13 @@ export default function CheckoutPage() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{t('tax')}</span>
-                    <span>{quote ? `$${quote.tax}` : '—'}</span>
+                    <span>{quote?.tax_applied && quote.checkout_allowed !== false ? `$${quote.tax}` : t('taxUnconfirmed')}</span>
                   </div>
                   {quote && !quote.tax_applied && (
                     <p className="text-[11px] text-muted-foreground">{t('taxNotApplied')}</p>
+                  )}
+                  {quote && quote.checkout_allowed === false && (
+                    <p className="text-[11px] text-destructive">{quote.checkout_block_reason || t('checkoutPausedTax')}</p>
                   )}
                   <div className="border-t pt-2 flex justify-between font-bold text-base">
                     <span>{t('total')}</span>
@@ -549,7 +574,7 @@ export default function CheckoutPage() {
                   className="w-full cursor-pointer mt-4"
                   size="lg"
                   onClick={handleCheckout}
-                  disabled={loading || !allergenAcknowledged || mixedCooks || !quote}
+                  disabled={loading || !allergenAcknowledged || mixedCooks || !quote || quote.checkout_allowed === false}
                 >
                   {loading
                     ? (locale === 'fa' ? 'در حال پردازش...' : 'Processing...')

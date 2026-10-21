@@ -22,6 +22,8 @@ FINANCIAL_KEYS = frozenset(
         "tax_rate",
         "tax_rules",
         "auto_tax_enabled",
+        "tax_configuration_reviewed",
+        "cook_delivery_approved",
         "minimum_order_amount",
         "minimum_order_enforced",
         "base_delivery_fee",
@@ -37,6 +39,8 @@ RATE_KEYS = frozenset({"platform_commission_rate", "customer_service_fee_rate", 
 BOOL_KEYS = frozenset(
     {
         "auto_tax_enabled",
+        "tax_configuration_reviewed",
+        "cook_delivery_approved",
         "minimum_order_enforced",
         "delivery_pricing_enabled",
         "pilot_mode",

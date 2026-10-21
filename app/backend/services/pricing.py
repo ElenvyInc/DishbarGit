@@ -130,6 +130,21 @@ class OrderMoney:
         }
 
 
+def live_checkout_block_reason(settings: Mapping[str, Any]) -> Optional[str]:
+    """Live checkout stays closed until an admin records a reviewed tax rule.
+
+    A missing flag, a legacy tax_rate, or a blank rule list does not open checkout.
+    An explicit enabled rule, including a reviewed 0% rule, does.
+    """
+    reviewed = str(settings.get("tax_configuration_reviewed", "false")).strip().lower() == "true"
+    if not reviewed:
+        return "Live checkout is paused until tax configuration is reviewed."
+    _cents, _enabled, applied = resolve_tax_cents(0, settings)
+    if not applied:
+        return "Live checkout needs an explicit reviewed tax rule. A blank rate or the legacy tax_rate value does not open checkout."
+    return None
+
+
 def resolve_tax_cents(food_subtotal_cents: int, settings: Mapping[str, Any]) -> tuple[int, bool, bool]:
     """Tax is not applied unless auto tax is explicitly enabled and a rule matches.
 

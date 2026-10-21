@@ -71,6 +71,15 @@ async def test_checkout_reservation_is_visible(client):
         from models.platform_settings import Platform_settings
 
         session.add(Platform_settings(key="pilot_mode", value="false", description="test"))
+        session.add(Platform_settings(key="auto_tax_enabled", value="true", description="test"))
+        session.add(Platform_settings(key="tax_configuration_reviewed", value="true", description="test"))
+        session.add(
+            Platform_settings(
+                key="tax_rules",
+                value='{"rules":[{"rate":"0","applies_to":"food_subtotal","enabled":true}]}',
+                description="test",
+            )
+        )
         chef = Chefs(user_id="cook-1", name="Cook", is_approved=True, is_active=True)
         session.add(chef)
         await session.flush()

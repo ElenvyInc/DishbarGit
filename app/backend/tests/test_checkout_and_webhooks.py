@@ -27,12 +27,25 @@ def sign_webhook(payload: bytes, secret: str = "whsec_test_only") -> str:
     return f"t={timestamp},v1={digest}"
 
 
-async def seed_meal(price: float = 45.0, max_orders: int = 20):
+REVIEWED_ZERO_RULE = '{"rules":[{"rate":"0","applies_to":"food_subtotal","enabled":true}]}'
+
+
+async def seed_meal(
+    price: float = 45.0,
+    max_orders: int = 20,
+    *,
+    reviewed: str = "true",
+    auto_tax: str = "true",
+    tax_rules: str = REVIEWED_ZERO_RULE,
+    tax_rate: str = "0.13",
+):
     async with SessionLocal() as session:
         session.add(Platform_settings(key="pilot_mode", value="false", description="test"))
         session.add(Platform_settings(key="platform_open", value="true", description="test"))
-        session.add(Platform_settings(key="auto_tax_enabled", value="false", description="test"))
-        session.add(Platform_settings(key="tax_rate", value="0.13", description="legacy"))
+        session.add(Platform_settings(key="auto_tax_enabled", value=auto_tax, description="test"))
+        session.add(Platform_settings(key="tax_configuration_reviewed", value=reviewed, description="test"))
+        session.add(Platform_settings(key="tax_rules", value=tax_rules, description="test"))
+        session.add(Platform_settings(key="tax_rate", value=tax_rate, description="legacy"))
         chef = Chefs(user_id="cook-1", name="Test Cook", is_approved=True, is_active=True, city="Toronto")
         session.add(chef)
         await session.flush()
@@ -69,7 +82,7 @@ async def test_checkout_charges_server_total_not_client_price(client, monkeypatc
 
     response = await client.post(
         "/api/v1/payment/create_payment_session",
-        headers=auth_header("customer-1"),
+        headers={**auth_header("customer-1"), "Idempotency-Key": "client-supplied-key"},
         json={
             "items": [{"id": item_id, "quantity": 1, "price": 0.01, "title": "tampered", "chef_id": 999}],
             "delivery_type": "pickup",
@@ -87,6 +100,8 @@ async def test_checkout_charges_server_total_not_client_price(client, monkeypatc
     charged = sum(item["price_data"]["unit_amount"] * item["quantity"] for item in line_items)
     assert charged == 4635
     assert captured["success_url"].startswith("https://dishbar.ca/payment-success")
+    assert captured["idempotency_key"].startswith("dishbar-order-")
+    assert captured["idempotency_key"] != "client-supplied-key"
 
     async with SessionLocal() as session:
         order = (await session.execute(select(Orders))).scalar_one()
@@ -118,7 +133,11 @@ async def test_quote_matches_approved_example_and_ignores_client_price(client):
     assert body["customer_total"] == "46.35"
     assert body["cook_share"] == "38.25"
     assert body["platform_gross"] == "8.10"
-    assert body["tax_applied"] is False
+    assert body["tax"] == "0.00"
+    assert body["tax_applied"] is True
+    assert body["checkout_allowed"] is True
+    assert body["cook_delivery_available"] is False
+    assert body["third_party_delivery_available"] is False
 
 
 @pytest.mark.asyncio
@@ -290,3 +309,139 @@ async def test_webhook_amount_mismatch_does_not_mark_paid(client):
     async with SessionLocal() as session:
         order = await session.get(Orders, order_id)
         assert order.payment_status == "review_required"
+
+
+def _checkout_body(item_id: int, delivery_type: str = "pickup") -> dict:
+    return {
+        "items": [{"id": item_id, "quantity": 1, "price": 0.01}],
+        "delivery_type": delivery_type,
+        "delivery_address": "1 Test Street",
+        "customer_name": "Customer One",
+        "customer_phone": "4165550100",
+        "allergen_acknowledged": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_unreviewed_tax_blocks_checkout_before_stripe_and_order(client, monkeypatch):
+    _chef_id, item_id = await seed_meal(reviewed="false", auto_tax="false", tax_rules='{"rules":[]}')
+
+    def fail_create(**kwargs):
+        raise AssertionError("Stripe must not be called while tax review is closed")
+
+    monkeypatch.setattr(stripe.checkout.Session, "create", fail_create)
+    stripe.api_key = "sk_test_placeholder"
+
+    response = await client.post(
+        "/api/v1/payment/create_payment_session",
+        headers=auth_header("customer-1"),
+        json=_checkout_body(item_id),
+    )
+    assert response.status_code == 503, response.text
+    assert "tax" in response.json()["detail"].lower()
+
+    quote = await client.post(
+        "/api/v1/payment/quote",
+        json={"items": [{"id": item_id, "quantity": 1}], "delivery_type": "pickup"},
+    )
+    assert quote.status_code == 200, quote.text
+    body = quote.json()
+    assert body["checkout_allowed"] is False
+    assert body["tax_applied"] is False
+    assert body["tax"] == "0.00"
+    assert body["customer_total"] == "46.35"
+    assert body["commission"] == "6.75"
+    assert body["cook_share"] == "38.25"
+    assert body["platform_gross"] == "8.10"
+
+    async with SessionLocal() as session:
+        orders = (await session.execute(select(Orders))).scalars().all()
+        assert orders == []
+
+
+@pytest.mark.asyncio
+async def test_legacy_tax_rate_does_not_open_checkout(client, monkeypatch):
+    _chef_id, item_id = await seed_meal(
+        reviewed="true",
+        auto_tax="true",
+        tax_rules='{"rules":[]}',
+        tax_rate="0.13",
+    )
+    monkeypatch.setattr(
+        stripe.checkout.Session,
+        "create",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("stripe")),
+    )
+    stripe.api_key = "sk_test_placeholder"
+    response = await client.post(
+        "/api/v1/payment/create_payment_session",
+        headers=auth_header("customer-1"),
+        json=_checkout_body(item_id),
+    )
+    assert response.status_code == 503, response.text
+    quote = await client.post(
+        "/api/v1/payment/quote",
+        json={"items": [{"id": item_id, "quantity": 1}], "delivery_type": "pickup"},
+    )
+    assert quote.json()["tax_cents"] == 0
+    assert quote.json()["checkout_allowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_reviewed_explicit_tax_rule_is_added_to_stripe_total(client, monkeypatch):
+    _chef_id, item_id = await seed_meal(
+        tax_rules='{"rules":[{"rate":"0.13","applies_to":"food_subtotal","enabled":true}]}'
+    )
+    captured = {}
+
+    def fake_create(**kwargs):
+        captured.update(kwargs)
+
+        class FakeSession:
+            id = "cs_test_tax"
+            url = "https://checkout.stripe.test/pay/cs_test_tax"
+
+        return FakeSession()
+
+    monkeypatch.setattr(stripe.checkout.Session, "create", fake_create)
+    stripe.api_key = "sk_test_placeholder"
+    response = await client.post(
+        "/api/v1/payment/create_payment_session",
+        headers=auth_header("customer-1"),
+        json=_checkout_body(item_id),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["customer_total_cents"] == 5220
+    charged = sum(item["price_data"]["unit_amount"] * item["quantity"] for item in captured["line_items"])
+    assert charged == 5220
+    async with SessionLocal() as session:
+        order = (await session.execute(select(Orders))).scalar_one()
+        assert order.tax_cents == 585
+        assert order.commission_cents == 675
+        assert order.service_fee_cents == 135
+        assert order.cook_share_cents == 3825
+        assert order.platform_gross_cents == 810
+        assert order.customer_total_cents == 5220
+
+
+@pytest.mark.asyncio
+async def test_unapproved_delivery_is_rejected(client, monkeypatch):
+    _chef_id, item_id = await seed_meal()
+    monkeypatch.setattr(
+        stripe.checkout.Session,
+        "create",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("stripe")),
+    )
+    stripe.api_key = "sk_test_placeholder"
+    for delivery_type in ("self_delivery", "third_party"):
+        quote = await client.post(
+            "/api/v1/payment/quote",
+            json={"items": [{"id": item_id, "quantity": 1}], "delivery_type": delivery_type},
+        )
+        assert quote.status_code == 400, quote.text
+        checkout = await client.post(
+            "/api/v1/payment/create_payment_session",
+            headers=auth_header("customer-1"),
+            json=_checkout_body(item_id, delivery_type),
+        )
+        assert checkout.status_code == 400, checkout.text
