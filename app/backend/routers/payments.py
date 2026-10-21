@@ -277,6 +277,9 @@ async def create_payment_session(
         if not data.allergen_acknowledged:
             raise HTTPException(status_code=400, detail="You must acknowledge the allergen notice before ordering")
 
+        # Fail closed until a trustworthy, approved delivery calculation is implemented.
+        if data.delivery_type != "pickup":
+            raise HTTPException(status_code=400, detail="Delivery is not available for pilot checkout.")
         # Validate pilot mode restrictions
         await _validate_pilot_mode(db, data.delivery_postal_code, data.delivery_type)
 
@@ -303,6 +306,8 @@ async def create_payment_session(
             raise HTTPException(status_code=503, detail="Checkout requires tax configuration review.")
         tax_rate = float(tax_rate_str)
         service_fee_rate = float(service_fee_rate_str)
+        if any(not (0 <= rate <= 1) for rate in [tax_rate, service_fee_rate, commission_rate]):
+            raise HTTPException(status_code=503, detail="Invalid financial configuration.")
         min_order = float(min_order_str)
         base_delivery_fee = float(base_fee_str)
         max_delivery_fee = float(max_fee_str)
@@ -425,7 +430,7 @@ async def create_payment_session(
             stripe_params["customer_email"] = data.customer_email.strip()
 
         # Use a stable idempotency key so retries cannot create duplicate Stripe sessions.
-        idempotency_key = request.headers.get("Idempotency-Key") or f"dishbar-order-{order_id}"
+        idempotency_key = f"dishbar-order-{order_id}"
         if len(idempotency_key) > 255:
             raise HTTPException(status_code=400, detail="Idempotency-Key is too long")
         session = stripe.checkout.Session.create(
@@ -536,12 +541,14 @@ async def verify_payment(
             )
             order = result.scalar_one_or_none()
 
+            if order and order.stripe_session_id and order.stripe_session_id != session.id:
+                raise HTTPException(status_code=403, detail="Payment session mismatch")
             if order and str(order.user_id) != str(current_user.id) and current_user.role != "admin":
                 raise HTTPException(status_code=403, detail="You do not have access to this payment session")
 
             if order:
                 status_mapping = {"complete": "paid", "open": "pending", "expired": "cancelled"}
-                payment_status = "paid" if session.payment_status == "paid" else ("cancelled" if session.status == "expired" else "pending")
+                payment_status = "paid" if (session.payment_status == "paid" and session.currency == "cad" and session.amount_total == round(order.total_amount * 100)) else ("cancelled" if session.status == "expired" else "pending")
 
                 # Only update if status actually changed (prevent duplicate processing)
                 if order.payment_status != payment_status:
@@ -564,6 +571,8 @@ async def verify_payment(
             payment_status=session.payment_status or "unpaid",
         )
 
+    except HTTPException:
+        raise
     except stripe.error.StripeError as e:
         logger.error(f"Stripe verification error: {e}")
         raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")
