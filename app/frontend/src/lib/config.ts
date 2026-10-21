@@ -6,10 +6,19 @@ let runtimeConfig: {
 // Configuration loading state
 let configLoading = true;
 
-// Default fallback configuration
+// Local default is for development only. Production builds never use it.
 const defaultConfig = {
-  API_BASE_URL: 'http://127.0.0.1:8000', // Only used if runtime config fails to load
+  API_BASE_URL: 'http://127.0.0.1:8000',
 };
+
+function isLocalhostUrl(url: string): boolean {
+  try {
+    const host = new URL(url, 'http://localhost').hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
+  } catch {
+    return true;
+  }
+}
 
 // Function to load runtime configuration
 export async function loadRuntimeConfig(): Promise<void> {
@@ -46,29 +55,33 @@ export async function loadRuntimeConfig(): Promise<void> {
 
 // Get current configuration
 export function getConfig() {
-  // If config is still loading, return default config to avoid using stale Vite env vars
+  const production = import.meta.env.PROD;
+
+  if (production) {
+    const runtimeUrl = runtimeConfig?.API_BASE_URL;
+    if (runtimeUrl && !isLocalhostUrl(runtimeUrl)) {
+      return { API_BASE_URL: runtimeUrl };
+    }
+    const viteUrl = import.meta.env.VITE_API_BASE_URL;
+    if (viteUrl && !isLocalhostUrl(viteUrl)) {
+      return { API_BASE_URL: viteUrl };
+    }
+    // Same-origin. Never fall back to localhost in a production build.
+    return { API_BASE_URL: '' };
+  }
+
   if (configLoading) {
-    console.log('Config still loading, using default config');
     return defaultConfig;
   }
 
-  // First try runtime config (for Lambda)
-  if (runtimeConfig) {
-    console.log('Using runtime config');
+  if (runtimeConfig?.API_BASE_URL) {
     return runtimeConfig;
   }
 
-  // Then try Vite environment variables (for local development)
   if (import.meta.env.VITE_API_BASE_URL) {
-    const viteConfig = {
-      API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
-    };
-    console.log('Using Vite environment config');
-    return viteConfig;
+    return { API_BASE_URL: import.meta.env.VITE_API_BASE_URL };
   }
 
-  // Finally fall back to default
-  console.log('Using default config');
   return defaultConfig;
 }
 

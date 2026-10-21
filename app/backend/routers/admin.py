@@ -33,6 +33,15 @@ class AdminStatsResponse(BaseModel):
     total_commission: float
     total_reviews: int
     orders_today: int
+    gmv: float = 0
+    commission_income: float = 0
+    service_fee_income: float = 0
+    tax_collected: float = 0
+    cook_payables: float = 0
+    platform_gross: float = 0
+    finance_note: str = (
+        "Snapshot totals only. Processing fees, payouts, and refunds are not settled here."
+    )
 
 
 class ChefApprovalRequest(BaseModel):
@@ -134,6 +143,19 @@ async def get_admin_stats(
         )
         orders_today = today_r.scalar() or 0
 
+        paid = Orders.payment_status == "paid"
+
+        async def sum_cents(column):
+            result = await db.execute(select(func.coalesce(func.sum(column), 0)).where(paid))
+            return int(result.scalar() or 0) / 100
+
+        gmv = await sum_cents(Orders.customer_total_cents)
+        commission_income = await sum_cents(Orders.commission_cents)
+        service_fee_income = await sum_cents(Orders.service_fee_cents)
+        tax_collected = await sum_cents(Orders.tax_cents)
+        cook_payables = await sum_cents(Orders.cook_share_cents)
+        platform_gross = await sum_cents(Orders.platform_gross_cents)
+
         return AdminStatsResponse(
             total_chefs=total_chefs,
             pending_chefs=pending_chefs,
@@ -143,10 +165,16 @@ async def get_admin_stats(
             total_commission=total_commission,
             total_reviews=total_reviews,
             orders_today=orders_today,
+            gmv=gmv,
+            commission_income=commission_income,
+            service_fee_income=service_fee_income,
+            tax_collected=tax_collected,
+            cook_payables=cook_payables,
+            platform_gross=platform_gross,
         )
     except Exception as e:
         logger.error(f"Admin stats error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/chefs")
@@ -197,7 +225,7 @@ async def list_all_chefs(
         }
     except Exception as e:
         logger.error(f"Admin list chefs error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/chefs/approve")
@@ -227,7 +255,7 @@ async def approve_or_suspend_chef(
         raise
     except Exception as e:
         logger.error(f"Chef approval error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/orders")
@@ -275,7 +303,7 @@ async def list_all_orders(
         }
     except Exception as e:
         logger.error(f"Admin list orders error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/orders/refund")
@@ -297,19 +325,27 @@ async def process_refund(
 
         if order.payment_status != "paid":
             raise HTTPException(status_code=400, detail="Order is not paid")
+        if not order.stripe_session_id or not stripe.api_key:
+            raise HTTPException(status_code=409, detail="This order cannot be refunded until Stripe confirms the payment")
 
-        # Process Stripe refund
-        if order.stripe_session_id:
-            session = stripe.checkout.Session.retrieve(order.stripe_session_id)
-            if session.payment_intent:
-                refund_amount = int((data.amount or order.total_amount) * 100)
-                stripe.Refund.create(
-                    payment_intent=session.payment_intent,
-                    amount=refund_amount,
-                )
+        from decimal import Decimal, ROUND_HALF_UP
+        base_cents = order.customer_total_cents
+        if base_cents is None:
+            base_cents = int((Decimal(str(order.total_amount)) * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        if data.amount is None:
+            refund_cents = int(base_cents)
+        else:
+            refund_cents = int((Decimal(str(data.amount)) * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        if refund_cents < 1 or refund_cents > int(base_cents):
+            raise HTTPException(status_code=400, detail="Refund amount is outside the amount paid")
 
-        order.payment_status = "refunded"
-        order.status = "cancelled"
+        session = stripe.checkout.Session.retrieve(order.stripe_session_id)
+        if not session.payment_intent:
+            raise HTTPException(status_code=409, detail="This order cannot be refunded until Stripe confirms the payment")
+        stripe.Refund.create(payment_intent=session.payment_intent, amount=refund_cents)
+
+        order.payment_status = "refunded" if refund_cents == int(base_cents) else "partially_refunded"
+        order.status = "refunded" if refund_cents == int(base_cents) else "partially_refunded"
         await db.commit()
 
         return {"message": "Refund processed successfully", "order_id": data.order_id}
@@ -317,7 +353,7 @@ async def process_refund(
         raise
     except Exception as e:
         logger.error(f"Refund error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/reviews")
@@ -356,7 +392,7 @@ async def list_all_reviews(
         }
     except Exception as e:
         logger.error(f"Admin list reviews error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/reviews/{review_id}")
@@ -379,7 +415,7 @@ async def delete_review(
         raise
     except Exception as e:
         logger.error(f"Delete review error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/notifications/send")
@@ -404,7 +440,7 @@ async def send_notification(
         return {"message": "Notification sent", "id": notification.id}
     except Exception as e:
         logger.error(f"Send notification error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/coupons")
@@ -431,7 +467,7 @@ async def create_coupon(
         return {"message": "Coupon created", "id": coupon.id, "code": coupon.code}
     except Exception as e:
         logger.error(f"Create coupon error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/coupons")
@@ -462,7 +498,7 @@ async def list_coupons(
         }
     except Exception as e:
         logger.error(f"List coupons error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/coupons/{coupon_id}")
@@ -484,4 +520,4 @@ async def delete_coupon(
         raise
     except Exception as e:
         logger.error(f"Delete coupon error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

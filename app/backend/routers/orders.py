@@ -104,6 +104,26 @@ class OrdersBatchDeleteRequest(BaseModel):
     ids: List[int]
 
 
+_ORDER_MONEY_FIELDS = {
+    "payment_status",
+    "stripe_session_id",
+    "total_amount",
+    "commission_amount",
+    "chef_amount",
+    "items_json",
+}
+
+
+def _reject_client_order_mutation(update_dict: dict, role: str) -> None:
+    """Customers cannot mark an order paid or rewrite its prices."""
+    if role == "admin":
+        return
+    if any(field in update_dict for field in _ORDER_MONEY_FIELDS):
+        raise HTTPException(status_code=403, detail="You cannot change payment or pricing fields")
+    if "status" in update_dict and update_dict["status"] not in {"cancelled"}:
+        raise HTTPException(status_code=403, detail="You cannot change this order status")
+
+
 # ---------- Routes ----------
 @router.get("", response_model=OrdersListResponse)
 async def query_orderss(
@@ -219,17 +239,19 @@ async def create_orders(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new orders"""
-    logger.debug(f"Creating new orders with data: {data}")
-    
+    """Create a new orders. Customers place orders through checkout, not this route."""
     service = OrdersService(db)
     try:
+        if current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Orders are created through checkout")
         result = await service.create(data.model_dump(), user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create orders")
         
         logger.info(f"Orders created successfully with id: {result.id}")
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.error(f"Validation error creating orders: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -251,6 +273,8 @@ async def create_orderss_batch(
     results = []
     
     try:
+        if current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Orders are created through checkout")
         for item_data in request.items:
             result = await service.create(item_data.model_dump(), user_id=str(current_user.id))
             if result:
@@ -258,6 +282,8 @@ async def create_orderss_batch(
         
         logger.info(f"Batch created {len(results)} orderss successfully")
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error in batch create: {str(e)}", exc_info=True)
@@ -280,12 +306,15 @@ async def update_orderss_batch(
         for item in request.items:
             # Only include non-None values for partial updates
             update_dict = {k: v for k, v in item.updates.model_dump().items() if v is not None}
+            _reject_client_order_mutation(update_dict, current_user.role)
             result = await service.update(item.id, update_dict, user_id=str(current_user.id))
             if result:
                 results.append(result)
         
         logger.info(f"Batch updated {len(results)} orderss successfully")
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error in batch update: {str(e)}", exc_info=True)
@@ -306,6 +335,7 @@ async def update_orders(
     try:
         # Only include non-None values for partial updates
         update_dict = {k: v for k, v in data.model_dump().items() if v is not None}
+        _reject_client_order_mutation(update_dict, current_user.role)
         result = await service.update(id, update_dict, user_id=str(current_user.id))
         if not result:
             logger.warning(f"Orders with id {id} not found for update")

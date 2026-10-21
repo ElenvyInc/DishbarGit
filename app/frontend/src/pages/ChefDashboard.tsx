@@ -46,6 +46,8 @@ interface Order {
   id: number;
   items_json: string;
   total_amount: number;
+  chef_amount?: number;
+  cook_share?: string;
   status: string;
   delivery_type: string;
   customer_name: string;
@@ -123,7 +125,11 @@ export default function ChefDashboardPage() {
 
   const loadOrders = async () => {
     try {
-      const res = await client.entities.orders.query({ query: {}, sort: '-created_at', limit: 50 });
+      const res = await client.apiCall.invoke({
+        url: '/api/v1/cook/orders',
+        method: 'GET',
+        data: {},
+      });
       if (res?.data?.items) {
         setOrders(res.data.items);
       }
@@ -136,10 +142,10 @@ export default function ChefDashboardPage() {
     setSaving(true);
     try {
       if (chef?.id) {
-        await client.entities.chefs.update({ id: String(chef.id), data: profileForm });
+        await client.entities.chefs.update({ id: String(chef.id), data: { ...profileForm } });
         toast.success(locale === 'fa' ? 'پروفایل به‌روزرسانی شد' : 'Profile updated');
       } else {
-        const res = await client.entities.chefs.create({ data: profileForm });
+        const res = await client.entities.chefs.create({ data: { ...profileForm } });
         setChef(res.data);
         toast.success(locale === 'fa' ? 'پروفایل ایجاد شد' : 'Profile created');
       }
@@ -189,7 +195,11 @@ export default function ChefDashboardPage() {
 
   const handleUpdateOrderStatus = async (orderId: number, status: string) => {
     try {
-      await client.entities.orders.update({ id: String(orderId), data: { status } });
+      await client.apiCall.invoke({
+        url: `/api/v1/cook/orders/${orderId}/status`,
+        method: 'POST',
+        data: { status },
+      });
       toast.success('Order updated');
       loadOrders();
     } catch (e) {
@@ -468,20 +478,20 @@ export default function ChefDashboardPage() {
                           <p>{locale === 'fa' ? 'مشتری' : 'Customer'}: {order.customer_name}</p>
                           <p>{locale === 'fa' ? 'تلفن' : 'Phone'}: {order.customer_phone}</p>
                           <p>{locale === 'fa' ? 'تحویل' : 'Delivery'}: {order.delivery_type}</p>
-                          <p className="font-semibold text-foreground">{t('total')}: ${order.total_amount?.toFixed(2)}</p>
+                          <p className="font-semibold text-foreground">{t('total')}: ${order.cook_share || order.chef_amount?.toFixed?.(2) || order.total_amount?.toFixed(2)}</p>
                           <p className="text-xs">{new Date(order.created_at).toLocaleString()}</p>
                         </div>
-                        {order.status === 'pending' && (
+                        {(order.status === 'awaiting_acceptance' || (order.status === 'pending' && order.payment_status === 'paid')) && (
                           <div className="flex gap-2 mt-3">
-                            <Button size="sm" onClick={() => handleUpdateOrderStatus(order.id, 'confirmed')} className="cursor-pointer">
-                              {locale === 'fa' ? 'تأیید' : 'Confirm'}
+                            <Button size="sm" onClick={() => handleUpdateOrderStatus(order.id, 'accepted')} className="cursor-pointer">
+                              {locale === 'fa' ? 'پذیرش' : 'Accept'}
                             </Button>
                             <Button size="sm" variant="destructive" onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')} className="cursor-pointer">
                               {locale === 'fa' ? 'لغو' : 'Cancel'}
                             </Button>
                           </div>
                         )}
-                        {order.status === 'confirmed' && (
+                        {(order.status === 'accepted' || order.status === 'confirmed') && (
                           <Button size="sm" className="mt-3 cursor-pointer" onClick={() => handleUpdateOrderStatus(order.id, 'preparing')}>
                             {locale === 'fa' ? 'شروع آماده‌سازی' : 'Start Preparing'}
                           </Button>
@@ -492,9 +502,9 @@ export default function ChefDashboardPage() {
                           </Button>
                         )}
                         {order.status === 'ready' && (
-                          <Button size="sm" className="mt-3 cursor-pointer" onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}>
-                            {locale === 'fa' ? 'تحویل داده شد' : 'Mark Delivered'}
-                          </Button>
+                            <Button size="sm" className="mt-3 cursor-pointer" onClick={() => handleUpdateOrderStatus(order.id, 'completed')}>
+                              {locale === 'fa' ? 'تکمیل شد' : 'Mark completed'}
+                            </Button>
                         )}
                       </div>
                     ))}

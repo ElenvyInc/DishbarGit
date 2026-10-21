@@ -93,14 +93,20 @@ async def get_settings(current_user: UserResponse = Depends(get_admin_user)):
 
         frontend_descriptions = {"VITE_API_BASE_URL": "Base API URL", "VITE_FRONTEND_URL": "Frontend URL"}
 
-        # Build response data
+        def present(key: str, value: str) -> str:
+            upper = key.upper()
+            if any(marker in upper for marker in ("SECRET", "PASSWORD", "TOKEN", "DATABASE_URL", "DSN")) or upper.endswith("_KEY"):
+                return "[redacted]"
+            return value
+
+        # Build response data. Secret values are not returned.
         backend_config = {}
         for key, value in backend_vars.items():
-            backend_config[key] = EnvVariable(key=key, value=value, description=backend_descriptions.get(key, ""))
+            backend_config[key] = EnvVariable(key=key, value=present(key, value), description=backend_descriptions.get(key, ""))
 
         frontend_config = {}
         for key, value in frontend_vars.items():
-            frontend_config[key] = EnvVariable(key=key, value=value, description=frontend_descriptions.get(key, ""))
+            frontend_config[key] = EnvVariable(key=key, value=present(key, value), description=frontend_descriptions.get(key, ""))
 
         return EnvConfig(backend_vars=backend_config, frontend_vars=frontend_config)
     except Exception as e:

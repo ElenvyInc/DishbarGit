@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from core.config import settings
+from core.endpoint_access import apply_endpoint_access
+from core.redirects import allowed_cors_origins
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -95,11 +97,10 @@ app = FastAPI(
 # MODULE_MIDDLEWARE_START
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r".*",
+    allow_origins=allowed_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Stripe-Signature", "Idempotency-Key", "App-Host"],
 )
 # MODULE_MIDDLEWARE_END
 
@@ -199,6 +200,9 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+apply_endpoint_access(app)
 
 
 def run_in_debug_mode(app: FastAPI):

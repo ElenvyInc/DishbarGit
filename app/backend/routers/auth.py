@@ -4,6 +4,7 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
+from core.redirects import resolve_allowed_origin
 from core.auth import (
     IDTokenValidationError,
     build_authorization_url,
@@ -43,30 +44,29 @@ def _local_patch(url: str) -> str:
 
 
 def get_dynamic_backend_url(request: Request) -> str:
-    """Get backend URL dynamically from request headers.
-
-    Priority: mgx-external-domain > x-forwarded-host > host > settings.backend_url
-    """
-    mgx_external_domain = request.headers.get("mgx-external-domain")
-    x_forwarded_host = request.headers.get("x-forwarded-host")
-    host = request.headers.get("host")
+    """Choose an allowlisted origin. Request hosts are ignored unless listed."""
     scheme = request.headers.get("x-forwarded-proto", "https")
+    candidates = [
+        request.headers.get("mgx-external-domain"),
+        request.headers.get("x-forwarded-host"),
+        request.headers.get("host"),
+    ]
+    for host in candidates:
+        if not host:
+            continue
+        origin = resolve_allowed_origin(f"{scheme}://{host.split(',')[0].strip()}")
+        if origin:
+            return _local_patch(origin)
 
-    effective_host = mgx_external_domain or x_forwarded_host or host
-    if not effective_host:
-        logger.warning("[get_dynamic_backend_url] No host found, fallback to %s", settings.backend_url)
-        return settings.backend_url
-
-    dynamic_url = _local_patch(f"{scheme}://{effective_host}")
-    logger.debug(
-        "[get_dynamic_backend_url] mgx-external-domain=%s, x-forwarded-host=%s, host=%s, scheme=%s, dynamic_url=%s",
-        mgx_external_domain,
-        x_forwarded_host,
-        host,
-        scheme,
-        dynamic_url,
-    )
-    return dynamic_url
+    for configured in (
+        os.getenv("PYTHON_BACKEND_URL", ""),
+        os.getenv("BACKEND_URL", ""),
+        settings.backend_url,
+    ):
+        origin = resolve_allowed_origin(configured)
+        if origin:
+            return origin
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect host is not allowed")
 
 
 def derive_name_from_email(email: str) -> str:

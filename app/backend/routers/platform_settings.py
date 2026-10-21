@@ -9,12 +9,19 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
+from dependencies.auth import get_admin_user
+from schemas.auth import UserResponse
 from services.platform_settings import Platform_settingsService
+from services.settings_guard import audit_setting_change
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/entities/platform_settings", tags=["platform_settings"])
+router = APIRouter(
+    prefix="/api/v1/entities/platform_settings",
+    tags=["platform_settings"],
+    dependencies=[Depends(get_admin_user)],
+)
 
 
 # ---------- Pydantic Schemas ----------
@@ -23,6 +30,7 @@ class Platform_settingsData(BaseModel):
     key: str
     value: str
     description: str = None
+    reason: Optional[str] = None
 
 
 class Platform_settingsUpdateData(BaseModel):
@@ -30,6 +38,7 @@ class Platform_settingsUpdateData(BaseModel):
     key: Optional[str] = None
     value: Optional[str] = None
     description: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class Platform_settingsResponse(BaseModel):
@@ -112,7 +121,7 @@ async def query_platform_settingss(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error querying platform_settingss: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/all", response_model=Platform_settingsListResponse)
@@ -152,7 +161,7 @@ async def query_platform_settingss_all(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error querying platform_settingss: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{id}", response_model=Platform_settingsResponse)
@@ -176,36 +185,49 @@ async def get_platform_settings(
         raise
     except Exception as e:
         logger.error(f"Error fetching platform_settings {id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("", response_model=Platform_settingsResponse, status_code=201)
 async def create_platform_settings(
     data: Platform_settingsData,
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new platform_settings"""
-    logger.debug(f"Creating new platform_settings with data: {data}")
-    
     service = Platform_settingsService(db)
     try:
-        result = await service.create(data.model_dump())
+        payload = data.model_dump()
+        reason = payload.pop("reason", None)
+        await audit_setting_change(
+            db,
+            actor_id=current_user.id,
+            actor_role=current_user.role,
+            key=payload["key"],
+            old_value=None,
+            new_value=payload["value"],
+            reason=reason,
+        )
+        result = await service.create(payload)
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create platform_settings")
         
         logger.info(f"Platform_settings created successfully with id: {result.id}")
         return result
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.error(f"Validation error creating platform_settings: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating platform_settings: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/batch", response_model=List[Platform_settingsResponse], status_code=201)
 async def create_platform_settingss_batch(
     request: Platform_settingsBatchCreateRequest,
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create multiple platform_settingss in a single request"""
@@ -216,21 +238,35 @@ async def create_platform_settingss_batch(
     
     try:
         for item_data in request.items:
-            result = await service.create(item_data.model_dump())
+            payload = item_data.model_dump()
+            reason = payload.pop("reason", None)
+            await audit_setting_change(
+                db,
+                actor_id=current_user.id,
+                actor_role=current_user.role,
+                key=payload["key"],
+                old_value=None,
+                new_value=payload["value"],
+                reason=reason,
+            )
+            result = await service.create(payload)
             if result:
                 results.append(result)
         
         logger.info(f"Batch created {len(results)} platform_settingss successfully")
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error in batch create: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Batch create failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/batch", response_model=List[Platform_settingsResponse])
 async def update_platform_settingss_batch(
     request: Platform_settingsBatchUpdateRequest,
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update multiple platform_settingss in a single request"""
@@ -241,33 +277,58 @@ async def update_platform_settingss_batch(
     
     try:
         for item in request.items:
-            # Only include non-None values for partial updates
             update_dict = {k: v for k, v in item.updates.model_dump().items() if v is not None}
+            reason = update_dict.pop("reason", None)
+            existing = await service.get_by_id(item.id)
+            if existing is not None and ("value" in update_dict or "key" in update_dict):
+                await audit_setting_change(
+                    db,
+                    actor_id=current_user.id,
+                    actor_role=current_user.role,
+                    key=update_dict.get("key", existing.key),
+                    old_value=existing.value,
+                    new_value=update_dict.get("value", existing.value),
+                    reason=reason,
+                )
             result = await service.update(item.id, update_dict)
             if result:
                 results.append(result)
         
         logger.info(f"Batch updated {len(results)} platform_settingss successfully")
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error in batch update: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Batch update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/{id}", response_model=Platform_settingsResponse)
 async def update_platform_settings(
     id: int,
     data: Platform_settingsUpdateData,
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update an existing platform_settings"""
-    logger.debug(f"Updating platform_settings {id} with data: {data}")
-
     service = Platform_settingsService(db)
     try:
-        # Only include non-None values for partial updates
         update_dict = {k: v for k, v in data.model_dump().items() if v is not None}
+        reason = update_dict.pop("reason", None)
+        existing = await service.get_by_id(id)
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Platform_settings not found")
+        if "value" in update_dict or "key" in update_dict:
+            await audit_setting_change(
+                db,
+                actor_id=current_user.id,
+                actor_role=current_user.role,
+                key=update_dict.get("key", existing.key),
+                old_value=existing.value,
+                new_value=update_dict.get("value", existing.value),
+                reason=reason,
+            )
         result = await service.update(id, update_dict)
         if not result:
             logger.warning(f"Platform_settings with id {id} not found for update")
@@ -282,12 +343,14 @@ async def update_platform_settings(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error updating platform_settings {id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/batch")
 async def delete_platform_settingss_batch(
     request: Platform_settingsBatchDeleteRequest,
+    reason: Optional[str] = Query(None),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete multiple platform_settingss by their IDs"""
@@ -298,28 +361,52 @@ async def delete_platform_settingss_batch(
     
     try:
         for item_id in request.ids:
+            existing = await service.get_by_id(item_id)
+            if existing is not None:
+                await audit_setting_change(
+                    db,
+                    actor_id=current_user.id,
+                    actor_role=current_user.role,
+                    key=existing.key,
+                    old_value=existing.value,
+                    new_value="",
+                    reason=reason,
+                )
             success = await service.delete(item_id)
             if success:
                 deleted_count += 1
         
         logger.info(f"Batch deleted {deleted_count} platform_settingss successfully")
         return {"message": f"Successfully deleted {deleted_count} platform_settingss", "deleted_count": deleted_count}
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Error in batch delete: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Batch delete failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/{id}")
 async def delete_platform_settings(
     id: int,
+    reason: Optional[str] = Query(None),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a single platform_settings by ID"""
-    logger.debug(f"Deleting platform_settings with id: {id}")
-    
     service = Platform_settingsService(db)
     try:
+        existing = await service.get_by_id(id)
+        if existing is not None:
+            await audit_setting_change(
+                db,
+                actor_id=current_user.id,
+                actor_role=current_user.role,
+                key=existing.key,
+                old_value=existing.value,
+                new_value="",
+                reason=reason,
+            )
         success = await service.delete(id)
         if not success:
             logger.warning(f"Platform_settings with id {id} not found for deletion")
@@ -331,4 +418,4 @@ async def delete_platform_settings(
         raise
     except Exception as e:
         logger.error(f"Error deleting platform_settings {id}: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

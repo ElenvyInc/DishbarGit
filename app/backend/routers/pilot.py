@@ -14,9 +14,10 @@ from sqlalchemy import select, func, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from dependencies.auth import get_current_user
+from dependencies.auth import get_admin_user
 from schemas.auth import UserResponse
 from models.platform_settings import Platform_settings
+from services.settings_guard import audit_setting_change
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +42,18 @@ DEFAULT_SETTINGS = {
     "per_km_fee": {"value": "1.50", "description": "Fee per km beyond included distance"},
     "max_delivery_fee": {"value": "15.00", "description": "Maximum delivery fee cap in CAD"},
     "free_pickup": {"value": "true", "description": "Whether pickup is free"},
-    "platform_commission_rate": {"value": "0.15", "description": "Platform commission rate (0.15 = 15%)"},
-    "tax_rate": {"value": "0.13", "description": "HST rate for Ontario"},
+    "platform_commission_rate": {"value": "0.15", "description": "Cook commission rate deducted from the cook (0.15 = 15% of food subtotal)"},
+    "customer_service_fee_rate": {"value": "0.03", "description": "Customer service fee added to the customer (0.03 = 3% of food subtotal)"},
+    "tax_rate": {"value": "0", "description": "Legacy rate. Not applied unless auto_tax_enabled is true and tax_rules contains an enabled rule."},
+    "auto_tax_enabled": {"value": "false", "description": "When false, checkout adds no tax. Do not enable until an owner approves a tax rule."},
+    "tax_rules": {"value": "{\"auto_tax_enabled\": false, \"rules\": []}", "description": "JSON tax rules. Empty by default. Fees are not taxed."},
+    "minimum_order_enforced": {"value": "false", "description": "When false, minimum_order_amount is stored but not enforced."},
+    "delivery_pricing_enabled": {"value": "false", "description": "When false, delivery fees are not charged. Distance estimates are not used."},
     "cancellation_deadline_minutes": {"value": "30", "description": "Minutes after order when cancellation is still allowed"},
     "order_cutoff_hours_before": {"value": "2", "description": "Hours before available_date when ordering closes"},
     "chef_preparation_time_minutes": {"value": "60", "description": "Default chef preparation time in minutes"},
     "support_email": {"value": "support@dishbar.ca", "description": "Support email address"},
-    "support_phone": {"value": "+1-647-000-0000", "description": "Support phone number"},
+    "support_phone": {"value": "", "description": "Support phone. Leave empty until a real number is approved. Do not publish a placeholder."},
     "terms_url": {"value": "/legal/terms", "description": "Terms of Service URL"},
     "privacy_url": {"value": "/legal/privacy", "description": "Privacy Policy URL"},
     "refund_policy_url": {"value": "/legal/refund", "description": "Refund Policy URL"},
@@ -68,6 +74,7 @@ class SettingResponse(BaseModel):
 class SettingUpdateRequest(BaseModel):
     key: str
     value: str
+    reason: Optional[str] = None
 
 
 class SettingsBulkUpdateRequest(BaseModel):
@@ -92,7 +99,10 @@ class PilotStatusResponse(BaseModel):
     max_delivery_fee: float
     free_pickup: bool
     platform_commission_rate: float
+    customer_service_fee_rate: float
     tax_rate: float
+    auto_tax_enabled: bool
+    delivery_pricing_enabled: bool
     support_email: str
     support_phone: str
     manual_payouts: bool
@@ -100,7 +110,7 @@ class PilotStatusResponse(BaseModel):
 
 @router.get("/all")
 async def get_all_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get all platform settings (admin only)"""
@@ -122,13 +132,13 @@ async def get_all_settings(
         }
     except Exception as e:
         logger.error(f"Error getting settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/update")
 async def update_setting(
     data: SettingUpdateRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a single platform setting"""
@@ -137,6 +147,16 @@ async def update_setting(
             select(Platform_settings).where(Platform_settings.key == data.key)
         )
         setting = result.scalar_one_or_none()
+        old_value = setting.value if setting else None
+        await audit_setting_change(
+            db,
+            actor_id=current_user.id,
+            actor_role=current_user.role,
+            key=data.key,
+            old_value=old_value,
+            new_value=data.value,
+            reason=data.reason,
+        )
 
         if setting:
             setting.value = data.value
@@ -150,15 +170,17 @@ async def update_setting(
 
         await db.commit()
         return {"message": f"Setting '{data.key}' updated", "key": data.key, "value": data.value}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating setting: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/bulk-update")
 async def bulk_update_settings(
     data: SettingsBulkUpdateRequest,
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update multiple platform settings at once"""
@@ -168,6 +190,16 @@ async def bulk_update_settings(
                 select(Platform_settings).where(Platform_settings.key == item.key)
             )
             setting = result.scalar_one_or_none()
+            old_value = setting.value if setting else None
+            await audit_setting_change(
+                db,
+                actor_id=current_user.id,
+                actor_role=current_user.role,
+                key=item.key,
+                old_value=old_value,
+                new_value=item.value,
+                reason=item.reason,
+            )
             if setting:
                 setting.value = item.value
             else:
@@ -180,14 +212,16 @@ async def bulk_update_settings(
 
         await db.commit()
         return {"message": f"Updated {len(data.settings)} settings"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error bulk updating settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/initialize")
 async def initialize_settings(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Initialize all default settings (only adds missing ones)"""
@@ -196,12 +230,12 @@ async def initialize_settings(
         return {"message": f"Initialized {count} settings"}
     except Exception as e:
         logger.error(f"Error initializing settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/pause-ordering")
 async def pause_ordering(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Emergency: pause all ordering immediately"""
@@ -218,12 +252,12 @@ async def pause_ordering(
         return {"message": "Ordering paused", "platform_open": False}
     except Exception as e:
         logger.error(f"Error pausing ordering: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/resume-ordering")
 async def resume_ordering(
-    current_user: UserResponse = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Resume ordering after pause"""
@@ -240,7 +274,7 @@ async def resume_ordering(
         return {"message": "Ordering resumed", "platform_open": True}
     except Exception as e:
         logger.error(f"Error resuming ordering: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ---- Public endpoint for pilot status (no auth) ----
@@ -274,7 +308,10 @@ async def get_pilot_status(
                 return 0
 
         def get_str(key: str) -> str:
-            return settings_map.get(key, DEFAULT_SETTINGS.get(key, {}).get("value", ""))
+            value = settings_map.get(key, DEFAULT_SETTINGS.get(key, {}).get("value", ""))
+            if key == "support_phone" and value.strip() in {"+1-647-000-0000", "647-000-0000"}:
+                return ""
+            return value
 
         def get_json_list(key: str) -> list:
             try:
@@ -300,14 +337,17 @@ async def get_pilot_status(
             max_delivery_fee=get_float("max_delivery_fee"),
             free_pickup=get_bool("free_pickup"),
             platform_commission_rate=get_float("platform_commission_rate"),
+            customer_service_fee_rate=get_float("customer_service_fee_rate"),
             tax_rate=get_float("tax_rate"),
+            auto_tax_enabled=get_bool("auto_tax_enabled"),
+            delivery_pricing_enabled=get_bool("delivery_pricing_enabled"),
             support_email=get_str("support_email"),
             support_phone=get_str("support_phone"),
             manual_payouts=get_bool("manual_payouts"),
         )
     except Exception as e:
         logger.error(f"Error getting pilot status: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def _initialize_defaults(db: AsyncSession) -> int:

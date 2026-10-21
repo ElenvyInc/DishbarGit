@@ -74,13 +74,19 @@ export default function HomePage() {
     setMobileOpen(false);
   };
 
-  const name = (item: Chef | MenuItem) => locale === 'fa'
-    ? ('name_fa' in item ? item.name_fa || item.name : item.title_fa || item.title)
-    : ('name' in item ? item.name : item.title);
+  const name = (item: Chef | MenuItem) => {
+    if ('title' in item) {
+      return locale === 'fa' ? item.title_fa || item.title : item.title;
+    }
+    return locale === 'fa' ? item.name_fa || item.name : item.name;
+  };
 
-  const description = (item: Chef | MenuItem) => locale === 'fa'
-    ? ('bio_fa' in item ? item.bio_fa || item.bio : item.description_fa || item.description)
-    : ('bio' in item ? item.bio : item.description);
+  const description = (item: Chef | MenuItem) => {
+    if ('title' in item) {
+      return locale === 'fa' ? item.description_fa || item.description || '' : item.description || '';
+    }
+    return locale === 'fa' ? item.bio_fa || item.bio || '' : item.bio || '';
+  };
 
   const languagePicker = (
     <div className="flex items-center gap-1 border rounded-lg p-1" aria-label={t('language')}>
